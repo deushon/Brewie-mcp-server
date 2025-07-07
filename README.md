@@ -10,14 +10,16 @@
 
 ### Обновлен способ подключения к ROS.
 Исправлены ошибки с вызовами методов подключения через WEB-socet.
-Web-socet менеджер переписан на основе библиотеки roslibPY через стандартные методы, например topic = roslibpy.Topic( self.ws, topic, topic_data_type )
-Вместо обычного сетевого взаимодействия в оригинале 
+Web-socet менеджер переписан на основе библиотеки roslibPY через стандартные методы, например
 ```python
-                # Ensure message is JSON serializable
-                json_msg = json.dumps(message)
-                self.ws.send(json_msg)
+topic = roslibpy.Topic( self.ws, topic, topic_data_type )
 ```
-
+Вместо обычного сетевого взаимодействия в оригинале через JSON
+```python
+# Ensure message is JSON serializable
+json_msg = json.dumps(message)
+self.ws.send(json_msg)
+```
 ### Добавлен голосовой агент для бесшовного управления.
 Голосовой агент вынесен в отдельный питон файл – voice_agent.py
 Так как он может быть запущен как на самом роботе, так и на отдельной станции для управления в одной локальной сети вместе с роботом.
