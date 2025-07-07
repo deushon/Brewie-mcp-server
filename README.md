@@ -12,9 +12,11 @@
 Исправлены ошибки с вызовами методов подключения через WEB-socet.
 Web-socet менеджер переписан на основе библиотеки roslibPY через стандартные методы, например topic = roslibpy.Topic( self.ws, topic, topic_data_type )
 Вместо обычного сетевого взаимодействия в оригинале 
+```python
                 # Ensure message is JSON serializable
                 json_msg = json.dumps(message)
                 self.ws.send(json_msg)
+```
 
 ### Добавлен голосовой агент для бесшовного управления.
 Голосовой агент вынесен в отдельный питон файл – voice_agent.py
