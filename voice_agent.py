@@ -28,7 +28,7 @@ ACCESSW_KEY = os.getenv("WAKEUP_API_KEY")
 
 # Пути к твоим .ppn файлам (ключи-слова)
 KEYWORD_PATHS = [
-    'Ai-Nex_en_windows_v3_0_0.ppn'
+    'robot_en_raspberry-pi_v3_0_0.ppn'
 ]
 # ==============================
 # Конфигурация
@@ -292,7 +292,7 @@ async def main():
 
     recognizer = sr.Recognizer()
     mic = sr.Microphone()
-    speak_with_gtts("AiNex ready")
+    speak_with_gtts("I am ready")
     
     # Создаем экземпляр Porcupine
     porcupine = pvporcupine.create(
