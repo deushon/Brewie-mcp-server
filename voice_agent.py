@@ -291,7 +291,7 @@ async def handle_conversation(user_input: str):
 async def main():
 
     recognizer = sr.Recognizer()
-    mic = sr.Microphone()
+    mic = sr.Microphone(device_index=0)
     speak_with_gtts("I am ready")
     
     # Создаем экземпляр Porcupine
