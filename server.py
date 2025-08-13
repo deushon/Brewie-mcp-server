@@ -11,7 +11,7 @@ import cv2
 from datetime import datetime
 import numpy as np
 
-ROSBRIDGE_IP = "192.168.20.144"
+ROSBRIDGE_IP = "192.168.20.23"
 ROSBRIDGE_PORT = 9090
 
 mcp = FastMCP("ros-mcp-server")

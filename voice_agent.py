@@ -5,7 +5,7 @@ import json
 import tempfile
 import time
 import re
-
+import roslibpy
 import speech_recognition as sr
 from gtts import gTTS
 import pygame
@@ -24,6 +24,10 @@ import pvporcupine
 
 # RASP ACCESS_KEY = '+cs716sY8uf8TNQLnIRV4oh58560fYNC1pOFgcf8rbP0FpVYGg4lEw==' 'Ai-Nex_en_raspberry-pi_v3_0_0.ppn'
 # Windows
+
+ROSBRIDGE_IP = "192.168.20.23"
+ROSBRIDGE_PORT = 9090
+
 ACCESSW_KEY = os.getenv("WAKEUP_API_KEY")
 
 # Пути к твоим .ppn файлам (ключи-слова)
