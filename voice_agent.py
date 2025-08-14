@@ -13,6 +13,7 @@ import pyaudio
 import struct
 import threading
 from hashlib import md5
+import roslibpy
 # ==============================
 # Проба замены метода активации
 # ==============================
@@ -295,53 +296,51 @@ async def handle_conversation(user_input: str):
 # ==============================
 # Основной цикл
 # ==============================
-def headUP():
-    ws_manager.connect()
-    tilt_msg = {
-        'position': 0.2,
-        'duration': 0.5,
-    }
-    ws_manager.send('/head_tilt_controller/command', 'std_msgs/Float64', tilt_msg)
-    ws_manager.close()
 
-
-def headDOWN():
-    ws_manager.connect()
-    #CHG
-    tilt_msg = {
-        'position': 0.0,
-        'duration': 0.5,
-    }
-    ws_manager.send('/head_tilt_controller/command', 'std_msgs/Float64', tilt_msg)
-    ws_manager.close()
 
 
 async def main():
     
 
-    ws_manager.connect()
-
+    client = roslibpy.Ros(host='localhost', port=9090)
+    client.run()
     time.sleep(1)
-    recognizer = sr.Recognizer()
-    mic = sr.Microphone()
-    speak_with_gtts("I am ready")
-    
-    
-    pan_msg = {
+
+    pan = roslibpy.Topic(client, '/head_pan_controller/command', 'std_msgs/Float64')
+    tilt = roslibpy.Topic(client, '/head_tilt_controller/command', 'std_msgs/Float64')
+    action = roslibpy.Topic(client, '/app/set_action', 'std_msgs/String')
+
+    headUPmsg = roslibpy.Message({
+        'position': 0.2,
+        'duration': 0.5,
+    })
+
+    headDOWNmsg = roslibpy.Message(    {
         'position': 0.0,
         'duration': 0.5,
-    }
+    })
 
-    ws_manager.send('/head_pan_controller/command', 'std_msgs/Float64', pan_msg)
+    panFXmsg = roslibpy.Message(    {
+        'position': 0.0,
+        'duration': 0.5,
+    })
 
-    message = ({
+    standBmsg = roslibpy.Message(    {
         'data': 'stand'
     })
-    ws_manager.send('/app/set_action', 'std_msgs/String', message)
-    ws_manager.close()
-    headUP()
+
+
+    recognizer = sr.Recognizer()
+    mic = sr.Microphone()
+
+    action.publish(standBmsg)
+    pan.publish(panFXmsg)
+
+    speak_with_gtts("I am ready")
+    
+    tilt.publish(headUPmsg)
     time.sleep(1)
-    headDOWN()
+    tilt.publish(headDOWNmsg)
 
 
     
@@ -378,24 +377,29 @@ async def main():
             keyword_index = porcupine.process(pcm)
 
             if keyword_index >= 0:
-                headUP()
                 print("Wake word detected!")
+                tilt.publish(headUPmsg)
                 speak_with_gtts("Yes?")
                 print("Listening for command...")
                 user_query = recognize_speech_from_mic(recognizer, mic)
-                if user_query:
-                    headDOWN()
+                if user_query:       
                     speak_with_gtts("Thinking...")
+                    tilt.publish(headDOWNmsg)
                     await handle_conversation(user_query)
                 else:
-                    headDOWN()
                     speak_with_gtts("I didn't catch that")
+                    tilt.publish(headDOWNmsg)
+                    
     except KeyboardInterrupt:
         print("\n User stop")
 
     finally:
         # Очистка ресурсов
-        ws_manager.close()
+        print("\n Clearning...")
+        action.unadvertise()
+        tilt.unadvertise()
+        pan.unadvertise()
+        client.terminate()
         stop_tts()
         if 'porcupine' in locals():
             porcupine.delete()
