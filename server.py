@@ -71,7 +71,7 @@ def defend(rotate: float, UPDOWN: float):
 
     client = roslibpy.Ros(host='localhost', port=9090)
     client.run()
-    
+    time.sleep(0.5)
 
     pan = roslibpy.Topic(client, '/head_pan_controller/command', 'std_msgs/Float64')
     tilt = roslibpy.Topic(client, '/head_tilt_controller/command', 'std_msgs/Float64')
@@ -102,6 +102,11 @@ def defend(rotate: float, UPDOWN: float):
     joy.publish(defStarmsg)
     time.sleep(1)
     joy.publish(defEndmsg)
+
+    joy.unadvertise()
+    tilt.unadvertise()
+    pan.unadvertise()
+    client.terminate()
 
 
     return "one less threat!"
