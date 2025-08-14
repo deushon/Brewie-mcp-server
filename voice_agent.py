@@ -6,6 +6,7 @@ import tempfile
 import time
 import re
 import roslibpy
+from utils.websocket_manager import WebSocketManager
 import speech_recognition as sr
 from gtts import gTTS
 import pygame
@@ -25,8 +26,39 @@ import pvporcupine
 # RASP ACCESS_KEY = '+cs716sY8uf8TNQLnIRV4oh58560fYNC1pOFgcf8rbP0FpVYGg4lEw==' 'Ai-Nex_en_raspberry-pi_v3_0_0.ppn'
 # Windows
 
-ROSBRIDGE_IP = "192.168.20.23"
+
+def send_head_command(ws_manager, head_pan, head_tilt, is_robot_locked):
+    if not is_robot_locked:
+        # Сообщение для управления поворотом (pan)
+        pan_msg = {
+            'position': -head_pan,
+            'duration': 0.25,
+        }
+        pan_command = {
+            'op': 'publish',
+            'topic': '/head_pan_controller/command',
+            'type': 'std_msgs/Float64',
+            'msg': pan_msg,
+        }
+        ws_manager.send(json.dumps(pan_command))
+
+        # Сообщение для управления наклоном (tilt)
+        tilt_msg = {
+            'position': head_tilt,
+            'duration': 0.25,
+        }
+        tilt_command = {
+            'op': 'publish',
+            'topic': '/head_tilt_controller/command',
+            'type': 'std_msgs/Float64',
+            'msg': tilt_msg,
+        }
+        ws_manager.send(json.dumps(tilt_command))
+
+ROSBRIDGE_IP = "127.0.0.1"
 ROSBRIDGE_PORT = 9090
+
+ws_manager = WebSocketManager(ROSBRIDGE_IP, ROSBRIDGE_PORT)
 
 ACCESSW_KEY = os.getenv("WAKEUP_API_KEY")
 
@@ -294,9 +326,16 @@ async def handle_conversation(user_input: str):
 
 async def main():
 
+    ws_manager = WebSocketManager(ROSBRIDGE_IP, ROSBRIDGE_PORT)
+    time.sleep(1)
     recognizer = sr.Recognizer()
     mic = sr.Microphone()
     speak_with_gtts("I am ready")
+    send_head_command(ws_manager, 0.5, 0.1, False)
+    message = ({
+        'data': 'stand'
+    })
+    ws_manager.send('app/set_action', 'std_msgs/String', message)
     
     # Создаем экземпляр Porcupine
     porcupine = pvporcupine.create(
