@@ -41,7 +41,7 @@ WAKE_WORD = "nex"
 MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
 
 ROSBRIDGE_IP = "127.0.0.1"
-ROSBRIDGE_PORT = 9090
+ROSBRIDGE_PORT = 8080
 
 ws_manager = WebSocketManager(ROSBRIDGE_IP, ROSBRIDGE_PORT)
 

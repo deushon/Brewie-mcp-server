@@ -12,7 +12,7 @@ from datetime import datetime
 import numpy as np
 
 ROSBRIDGE_IP = "127.0.0.1"
-ROSBRIDGE_PORT = 9090
+ROSBRIDGE_PORT = 8080
 
 mcp = FastMCP("ros-mcp-server")
 ws_manager = WebSocketManager(ROSBRIDGE_IP, ROSBRIDGE_PORT)
