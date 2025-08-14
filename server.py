@@ -58,6 +58,58 @@ def make_step(x: float, z: float):
 
     return "one step!"
 
+@mcp.tool(description="This tool allows you to defend yourself from your opponents. Call it to protect me from opponent. One call to one opponent. I will tell you where the enemy is in relation to you" \
+"Tool uses opponent's position [rotate] were 1.2 is maximum of right -1.2 maximum left [UPDOWN] where -0.3 is maximum down, 0.2 is maximum UP ")
+def defend(rotate: float, UPDOWN: float):
+    # Validate input
+    right_left = x
+    forward_backward = z
+    
+    # Clamp values between -1.0 and 1.0
+    rotate_fx = max(-1.2, min(1.2, rotate))
+    UPDOWN_fx = max(-0.3, min(0.2, UPDOWN))
+
+    client = roslibpy.Ros(host='localhost', port=9090)
+    client.run()
+    
+
+    pan = roslibpy.Topic(client, '/head_pan_controller/command', 'std_msgs/Float64')
+    tilt = roslibpy.Topic(client, '/head_tilt_controller/command', 'std_msgs/Float64')
+    joy = roslibpy.Topic(client, '/joy', 'sensor_msgs/Joy')
+
+    panmsg = roslibpy.Message({
+        'position': rotate_fx,
+        'duration': 0.5,
+    })
+
+    tiltmsg = roslibpy.Message({
+        'position': UPDOWN,
+        'duration': 0.5,
+    })
+
+    defStarmsg = roslibpy.Message({
+        'axes': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        'buttons': [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    })
+
+    defEndmsg = roslibpy.Message({
+        'axes': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        'buttons': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    })
+
+    pan.publish(panFXmsg)    
+    tilt.publish(headUPmsg)
+    joy.publish(defStarmsg)
+    time.sleep(1)
+    joy.publish(defEndmsg)
+
+
+    return "one less threat!"
+
+
+
+
+
 @mcp.tool(description='This tool getting action from topic on robot and write on python dict[file_name, description]')
 def get_available_actions():
     global actions_groups_data  # Needed to modify the global variable

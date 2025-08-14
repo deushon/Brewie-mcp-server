@@ -119,7 +119,7 @@ def stop_tts():
 
 # ==============================
 # Распознавание речи
-# ==============================
+# ==============================ex
 
 def recognize_speech_from_mic(recognizer, microphone):
     with microphone as source:
