@@ -59,12 +59,8 @@ def make_step(x: float, z: float):
     return "one step!"
 
 @mcp.tool(description="This tool allows you to defend yourself from your opponents. Call it to protect me from opponent. One call to one opponent. I will tell you where the enemy is in relation to you" \
-"Tool uses opponent's position [rotate] were 1.2 is maximum of right -1.2 maximum left [UPDOWN] where -0.3 is maximum down, 0.2 is maximum UP ")
+"Tool uses 2 float params (write it without "") for description opponent's position [rotate] were 1.2 is maximum of right -1.2 maximum left [UPDOWN] where -0.3 is maximum down, 0.2 is maximum UP ")
 def defend(rotate: float, UPDOWN: float):
-    # Validate input
-    right_left = x
-    forward_backward = z
-    
     # Clamp values between -1.0 and 1.0
     rotate_fx = max(-1.2, min(1.2, rotate))
     UPDOWN_fx = max(-0.3, min(0.2, UPDOWN))
@@ -83,7 +79,18 @@ def defend(rotate: float, UPDOWN: float):
     })
 
     tiltmsg = roslibpy.Message({
-        'position': UPDOWN,
+        'position': UPDOWN_fx,
+        'duration': 0.5,
+    })
+
+
+    panZmsg = roslibpy.Message({
+        'position': 0,
+        'duration': 0.5,
+    })
+
+    tilZtmsg = roslibpy.Message({
+        'position': 0,
         'duration': 0.5,
     })
 
@@ -97,11 +104,15 @@ def defend(rotate: float, UPDOWN: float):
         'buttons': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     })
 
-    pan.publish(panFXmsg)    
-    tilt.publish(headUPmsg)
+    pan.publish(panmsg)    
+    tilt.publish(tiltmsg)
+    time.sleep(0.8)
     joy.publish(defStarmsg)
-    time.sleep(1)
+    time.sleep(1.2)
     joy.publish(defEndmsg)
+    time.sleep(0.5)
+    pan.publish(panZmsg)    
+    tilt.publish(tilZtmsg)
 
     joy.unadvertise()
     tilt.unadvertise()
