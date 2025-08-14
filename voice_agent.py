@@ -1,11 +1,8 @@
 import asyncio
 import os
-import sys
 import json
 import tempfile
 import time
-import re
-import roslibpy
 from utils.websocket_manager import WebSocketManager
 import speech_recognition as sr
 from gtts import gTTS
@@ -27,38 +24,8 @@ import pvporcupine
 # Windows
 
 
-def send_head_command(ws_manager, head_pan, head_tilt, is_robot_locked):
-    if not is_robot_locked:
-        # Сообщение для управления поворотом (pan)
-        pan_msg = {
-            'position': -head_pan,
-            'duration': 0.25,
-        }
-        pan_command = {
-            'op': 'publish',
-            'topic': '/head_pan_controller/command',
-            'type': 'std_msgs/Float64',
-            'msg': pan_msg,
-        }
-        ws_manager.send(json.dumps(pan_command))
 
-        # Сообщение для управления наклоном (tilt)
-        tilt_msg = {
-            'position': head_tilt,
-            'duration': 0.25,
-        }
-        tilt_command = {
-            'op': 'publish',
-            'topic': '/head_tilt_controller/command',
-            'type': 'std_msgs/Float64',
-            'msg': tilt_msg,
-        }
-        ws_manager.send(json.dumps(tilt_command))
 
-ROSBRIDGE_IP = "127.0.0.1"
-ROSBRIDGE_PORT = 9090
-
-ws_manager = WebSocketManager(ROSBRIDGE_IP, ROSBRIDGE_PORT)
 
 ACCESSW_KEY = os.getenv("WAKEUP_API_KEY")
 
@@ -325,17 +292,48 @@ async def handle_conversation(user_input: str):
 # ==============================
 
 async def main():
+    
+    ROSBRIDGE_IP = "127.0.0.1"
+    ROSBRIDGE_PORT = 9090
 
     ws_manager = WebSocketManager(ROSBRIDGE_IP, ROSBRIDGE_PORT)
+    ws_manager.connect()
+
     time.sleep(1)
     recognizer = sr.Recognizer()
     mic = sr.Microphone()
     speak_with_gtts("I am ready")
-    send_head_command(ws_manager, 0.5, 0.1, False)
+    
+    
+    pan_msg = {
+        'position': 0.1,
+        'duration': 0.5,
+    }
+
+    ws_manager.send('/head_pan_controller/command', 'std_msgs/Float64', pan_msg)
+
+    tilt_msg = {
+        'position': 0.2,
+        'duration': 0.5,
+    }
+    ws_manager.send('/head_tilt_controller/command', 'std_msgs/Float64', tilt_msg)
+
+    time.sleep(1)
+
+
+    tilt_msg = {
+        'position': 0.0,
+        'duration': 0.5,
+    }
+    ws_manager.send('/head_tilt_controller/command', 'std_msgs/Float64', tilt_msg)
+    
+
     message = ({
         'data': 'stand'
     })
-    ws_manager.send('app/set_action', 'std_msgs/String', message)
+    ws_manager.send('/app/set_action', 'std_msgs/String', message)
+    
+    ws_manager.close()
     
     # Создаем экземпляр Porcupine
     porcupine = pvporcupine.create(
