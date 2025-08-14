@@ -40,6 +40,11 @@ KEYWORD_PATHS = [
 WAKE_WORD = "nex"
 MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
 
+ROSBRIDGE_IP = "127.0.0.1"
+ROSBRIDGE_PORT = 9090
+
+ws_manager = WebSocketManager(ROSBRIDGE_IP, ROSBRIDGE_PORT)
+
 # ==============================
 # TTS функция
 # ==============================
@@ -290,26 +295,30 @@ async def handle_conversation(user_input: str):
 # ==============================
 # Основной цикл
 # ==============================
-def headUP(ws: WebSocketManager):
+def headUP():
+    ws_manager.connect()
     tilt_msg = {
         'position': 0.2,
         'duration': 0.5,
     }
-    ws.send('/head_tilt_controller/command', 'std_msgs/Float64', tilt_msg)
+    ws_manager.send('/head_tilt_controller/command', 'std_msgs/Float64', tilt_msg)
+    ws_manager.close()
 
-def headDOWN(ws: WebSocketManager):
+
+def headDOWN():
+    ws_manager.connect()
+    #CHG
     tilt_msg = {
         'position': 0.0,
         'duration': 0.5,
     }
-    ws.send('/head_tilt_controller/command', 'std_msgs/Float64', tilt_msg)
+    ws_manager.send('/head_tilt_controller/command', 'std_msgs/Float64', tilt_msg)
+    ws_manager.close()
+
 
 async def main():
     
-    ROSBRIDGE_IP = "127.0.0.1"
-    ROSBRIDGE_PORT = 9090
 
-    ws_manager = WebSocketManager(ROSBRIDGE_IP, ROSBRIDGE_PORT)
     ws_manager.connect()
 
     time.sleep(1)
@@ -325,14 +334,16 @@ async def main():
 
     ws_manager.send('/head_pan_controller/command', 'std_msgs/Float64', pan_msg)
 
-    headUP(ws_manager)
-    time.sleep(1)
-    headDOWN(ws_manager)
-
     message = ({
         'data': 'stand'
     })
     ws_manager.send('/app/set_action', 'std_msgs/String', message)
+    ws_manager.close()
+    headUP()
+    time.sleep(1)
+    headDOWN()
+
+
     
     
 
@@ -367,13 +378,17 @@ async def main():
             keyword_index = porcupine.process(pcm)
 
             if keyword_index >= 0:
+                headUP()
                 print("Wake word detected!")
                 speak_with_gtts("Yes?")
                 print("Listening for command...")
                 user_query = recognize_speech_from_mic(recognizer, mic)
                 if user_query:
+                    headDOWN()
+                    speak_with_gtts("Thinking...")
                     await handle_conversation(user_query)
                 else:
+                    headDOWN()
                     speak_with_gtts("I didn't catch that")
     except KeyboardInterrupt:
         print("\n User stop")
