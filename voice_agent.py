@@ -290,6 +290,19 @@ async def handle_conversation(user_input: str):
 # ==============================
 # Основной цикл
 # ==============================
+def headUP(ws: WebSocketManager):
+    tilt_msg = {
+        'position': 0.2,
+        'duration': 0.5,
+    }
+    ws.send('/head_tilt_controller/command', 'std_msgs/Float64', tilt_msg)
+
+def headDOWN(ws: WebSocketManager):
+    tilt_msg = {
+        'position': 0.0,
+        'duration': 0.5,
+    }
+    ws.send('/head_tilt_controller/command', 'std_msgs/Float64', tilt_msg)
 
 async def main():
     
@@ -306,35 +319,23 @@ async def main():
     
     
     pan_msg = {
-        'position': 0.1,
+        'position': 0.0,
         'duration': 0.5,
     }
 
     ws_manager.send('/head_pan_controller/command', 'std_msgs/Float64', pan_msg)
 
-    tilt_msg = {
-        'position': 0.2,
-        'duration': 0.5,
-    }
-    ws_manager.send('/head_tilt_controller/command', 'std_msgs/Float64', tilt_msg)
-
+    headUP(ws_manager)
     time.sleep(1)
-
-
-    tilt_msg = {
-        'position': 0.0,
-        'duration': 0.5,
-    }
-    ws_manager.send('/head_tilt_controller/command', 'std_msgs/Float64', tilt_msg)
-    
+    headDOWN(ws_manager)
 
     message = ({
         'data': 'stand'
     })
     ws_manager.send('/app/set_action', 'std_msgs/String', message)
     
-    ws_manager.close()
     
+
     # Создаем экземпляр Porcupine
     porcupine = pvporcupine.create(
         access_key=ACCESSW_KEY,
@@ -379,6 +380,7 @@ async def main():
 
     finally:
         # Очистка ресурсов
+        ws_manager.close()
         stop_tts()
         if 'porcupine' in locals():
             porcupine.delete()
