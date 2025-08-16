@@ -296,7 +296,7 @@ async def handle_conversation(user_input: str):
 async def main():
     
 
-    client = roslibpy.Ros(host='localhost', port=8080)
+    client = roslibpy.Ros(host='localhost', port=9090)
     client.run()
     time.sleep(1)
 
