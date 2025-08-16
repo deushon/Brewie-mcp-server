@@ -12,7 +12,7 @@ from datetime import datetime
 import numpy as np
 
 ROSBRIDGE_IP = "127.0.0.1"
-ROSBRIDGE_PORT = 9090
+ROSBRIDGE_PORT = 8080
 
 mcp = FastMCP("ros-mcp-server")
 ws_manager = WebSocketManager(ROSBRIDGE_IP, ROSBRIDGE_PORT)
@@ -65,7 +65,7 @@ def defend(rotate: float, UPDOWN: float):
     rotate_fx = max(-1.2, min(1.2, rotate))
     UPDOWN_fx = max(-0.3, min(0.2, UPDOWN))
 
-    client = roslibpy.Ros(host='localhost', port=9090)
+    client = roslibpy.Ros(host='localhost', port=8080)
     client.run()
     time.sleep(0.5)
 

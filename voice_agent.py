@@ -40,12 +40,6 @@ KEYWORD_PATHS = [
 
 WAKE_WORD = "nex"
 MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
-
-ROSBRIDGE_IP = "127.0.0.1"
-ROSBRIDGE_PORT = 9090
-
-ws_manager = WebSocketManager(ROSBRIDGE_IP, ROSBRIDGE_PORT)
-
 # ==============================
 # TTS функция
 # ==============================
@@ -302,7 +296,7 @@ async def handle_conversation(user_input: str):
 async def main():
     
 
-    client = roslibpy.Ros(host='localhost', port=9090)
+    client = roslibpy.Ros(host='localhost', port=8080)
     client.run()
     time.sleep(1)
 
