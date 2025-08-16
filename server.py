@@ -84,12 +84,7 @@ def defend(rotate: float, UPDOWN: float):
     })
 
 
-    panZmsg = roslibpy.Message({
-        'position': 0,
-        'duration': 0.5,
-    })
-
-    tilZtmsg = roslibpy.Message({
+    headZeroMsg = roslibpy.Message({
         'position': 0,
         'duration': 0.5,
     })
@@ -110,9 +105,11 @@ def defend(rotate: float, UPDOWN: float):
     joy.publish(defStarmsg)
     time.sleep(1.2)
     joy.publish(defEndmsg)
+    time.sleep(0.1)
+    pan.publish(headZeroMsg)
+    time.sleep(0.1)
+    tilt.publish(headZeroMsg)
     time.sleep(0.5)
-    pan.publish(panZmsg)    
-    tilt.publish(tilZtmsg)
 
     joy.unadvertise()
     tilt.unadvertise()

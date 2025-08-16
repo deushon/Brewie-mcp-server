@@ -320,7 +320,7 @@ async def main():
     })
 
     standBmsg = roslibpy.Message(    {
-        'data': 'stand'
+        'data': 'walk_ready'
     })
 
 
