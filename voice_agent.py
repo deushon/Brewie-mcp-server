@@ -14,6 +14,7 @@ import struct
 import threading
 from hashlib import md5
 import roslibpy
+
 # ==============================
 # Проба замены метода активации
 # ==============================
@@ -39,7 +40,8 @@ KEYWORD_PATHS = [
 # ==============================
 
 WAKE_WORD = "nex"
-MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
+#MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
+MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 # ==============================
 # TTS функция
 # ==============================
@@ -323,6 +325,23 @@ async def main():
         'data': 'walk_ready'
     })
 
+    thinkmsg = roslibpy.Message(    {
+        'data': 'think'
+    })
+
+    s1msg = roslibpy.Message({
+        'position': 1,
+        'duration': 0.25,
+    })
+    s2msg = roslibpy.Message({
+        'position': -1.2,
+        'duration': 4.5,
+    })
+    s3sg = roslibpy.Message({
+        'position': 0,
+        'duration': 0.5,
+    })
+
 
     recognizer = sr.Recognizer()
     mic = sr.Microphone()
@@ -339,7 +358,13 @@ async def main():
 
     
     
-
+    #TODO
+    #Не работает ручнйо проброс микрофона, ошибка частоты
+    #Работает толкьо при старте с "по умолчанию". 
+    #Для этого 1 раз запускамем с выклченной внешенй звуковой
+    #Подключаем нужынй микрфоон
+    #Далее встроенный динамик можно вернуть
+    #ВОзможно просто достаточн озагрузиться без динамика или выдернуть его чтоыб поменялся индекс устрйоства?
     # Создаем экземпляр Porcupine
     porcupine = pvporcupine.create(
         access_key=ACCESSW_KEY,
@@ -356,6 +381,8 @@ async def main():
         frames_per_buffer=porcupine.frame_length
     )
 
+    #Словарь связанынй со стрельбой
+    search_words = ["save", "safe", "attack", "enemy", "opponent","fire"]
     print(f"Say AiNex to start...")
     try:
         while True:
@@ -377,8 +404,16 @@ async def main():
                 print("Listening for command...")
                 user_query = recognize_speech_from_mic(recognizer, mic)
                 if user_query:       
-                    speak_with_gtts("Thinking...")
+                    
                     tilt.publish(headDOWNmsg)
+                    if any(word in user_query for word in search_words):
+                        speak_with_gtts("I'll scout out the situation....")
+                        pan.publish(s1msg)
+                        time.sleep(0.5)
+                        pan.publish(s2msg)
+                    else:
+                        action.publish(thinkmsg)
+                        speak_with_gtts("Thinking...")
                     await handle_conversation(user_query)
                 else:
                     speak_with_gtts("I didn't catch that")
