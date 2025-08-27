@@ -166,7 +166,6 @@ async def init_system_prompt():
 
     result = await call_mcp_tool("get_available_actions", {})
 
-    # Упрощенный и более понятный системный промпт
     SYSTEM_PROMPT = (
         "You are a voice assistant controlling a robot through an MCP server.\n"
         "Available tools:\n" + 

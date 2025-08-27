@@ -11,6 +11,42 @@ import cv2
 from datetime import datetime
 import numpy as np
 
+from together import Together
+import base64
+
+#INTER API!!!
+
+
+def get_files_in_directory(directory_path):
+
+  files = []
+  for item in os.listdir(directory_path):
+    item_path = os.path.join(directory_path, item)
+    if os.path.isfile(item_path):
+      files.append(item)
+  return files
+
+def encode_image(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
+
+
+def photo_cln(folder_path):
+
+    if not os.path.isdir(folder_path):
+        print(f"Error: Path '{folder_path}' break")
+        return
+
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+        try:
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+                print(f"DELL: {file_path}")
+        except Exception as e:
+            print(f"Dell error {file_path}: {e}")
+
+
 ROSBRIDGE_IP = "127.0.0.1"
 ROSBRIDGE_PORT = 9090
 
@@ -190,7 +226,7 @@ def get_image():
         if received_msg is None:
             print("[Image] No data received from subscriber")
             image_topic.unsubscribe()
-            return None
+            return "No data"
 
         msg = received_msg
 
@@ -198,7 +234,6 @@ def get_image():
         width = msg["width"]
         encoding = msg["encoding"]
         data_b64 = msg["data"]
-
         image_bytes = base64.b64decode(data_b64)
         img_np = np.frombuffer(image_bytes, dtype=np.uint8)
 
@@ -212,16 +247,16 @@ def get_image():
         else:
             print(f"[Image] Unsupported encoding: {encoding}")
             image_topic.unsubscribe()
-            return None
+            return "Format error"
+        downloads_dir = "photos/environment"
+        items = os.listdir(downloads_dir)
 
-        if save_path is None:
-            downloads_dir = Path.home() / "Downloads"
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            save_path = downloads_dir / f"image_{timestamp}.png"
-
-        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        timestamp = str(len(items))
+        save_path = downloads_dir +"/"+ f"image_{timestamp}.png"
+        #Path(save_path).parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(save_path), img_cv)
-        os.startfile(save_path)
+        #os.startfile(save_path)
+        
         print(f"[Image] Saved to {save_path}")
 
         image_topic.unsubscribe()
@@ -229,10 +264,123 @@ def get_image():
         return img_cv
 
     except Exception as e:
-        print(f"[Image] Failed to receive or decode: {e}")
         if 'image_topic' in locals():
             image_topic.unsubscribe()
-        return None
+        return "[Image] Failed to receive or decode: "
+    
+@mcp.tool(description="This tool allows you to play sniper unlike the defender tool here the person says the description of the target and not its position, where it is the robot decides itself" \
+"Tool use one string param, it is description of target to shoot")
+def sniper(targediscr:str):
+
+
+    photo_cln("photos/environment")
+    client = roslibpy.Ros(host='localhost', port=9090)
+    client.run()
+    time.sleep(0.5)
+
+    pan = roslibpy.Topic(client, '/head_pan_controller/command', 'std_msgs/Float64')
+    joy = roslibpy.Topic(client, '/joy', 'sensor_msgs/Joy')
+
+    fmsg=[]
+
+    fmsg.append(roslibpy.Message({
+        'position': 1.2,
+        'duration': 0.5,
+    }))
+
+
+    fmsg.append(roslibpy.Message({
+        'position': 0,
+        'duration': 0.5,
+    }))
+
+    fmsg.append(roslibpy.Message({
+        'position': -1.2,
+        'duration': 0.5,
+    }))
+
+
+
+    defStarmsg = roslibpy.Message({
+        'axes': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        'buttons': [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    })
+
+    defEndmsg = roslibpy.Message({
+        'axes': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        'buttons': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    })
+
+    pan.publish(fmsg[0])    
+    time.sleep(1)
+    get_image()
+    time.sleep(1)
+    pan.publish(fmsg[1])    
+    time.sleep(1)
+    get_image()
+    time.sleep(1)
+    pan.publish(fmsg[2])    
+    time.sleep(1)
+    get_image()
+    time.sleep(1)
+    pan.publish(fmsg[1])
+
+
+    getDescriptionPrompt = "You see 3 photos (0,1,2). Return only the number of the photo in which, in your opinion, the object most closely resembles " + targediscr + ". The answer should only be one digit without additional words."
+
+    images = ["image_0.png","image_1.png","image_2.png"]
+
+    base64_images = []
+    for img in images:
+        base64_images.append(encode_image("photos/environment/"+img))
+
+    respons = LLMclient.chat.completions.create(
+    model="Qwen/Qwen2.5-VL-72B-Instruct",
+    messages=[{
+        "role": "user",
+        "content": [
+            {
+                "type": "text",
+                "text": getDescriptionPrompt
+            },
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_images[0]}"
+                }
+            },
+                        {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_images[1]}"
+                }
+            },
+                        {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_images[2]}"
+                }
+            }
+        ]
+    }],
+    )
+
+    pan.publish(fmsg[int(respons.choices[0].message.content)])    
+    time.sleep(0.8)
+       
+    
+
+    joy.publish(defStarmsg)
+    time.sleep(1.2)
+    joy.publish(defEndmsg)
+    time.sleep(1)    
+    pan.publish(fmsg[1])
+    time.sleep(0.1) 
+
+    joy.unadvertise()
+    pan.unadvertise()
+    client.terminate()
+    return 
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")
