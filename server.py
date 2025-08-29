@@ -1,9 +1,6 @@
-import argparse
 from mcp.server.fastmcp import FastMCP
 from typing import List, Any, Optional
 from pathlib import Path
-import json
-from utils.websocket_manager import WebSocketManager
 import time
 import os
 import roslibpy
@@ -17,6 +14,14 @@ import base64
 
 
 LLMclient = Together()
+ROSclient = roslibpy.Ros(host='localhost', port=9090)
+
+pan = roslibpy.Topic(ROSclient, '/head_pan_controller/command', 'std_msgs/Float64')
+tilt = roslibpy.Topic(ROSclient, '/head_tilt_controller/command', 'std_msgs/Float64')
+joy = roslibpy.Topic(ROSclient, '/joy', 'sensor_msgs/Joy')
+image_topic = roslibpy.Topic(ROSclient, '/camera/image_raw', 'sensor_msgs/Image')
+actionlist = roslibpy.Topic(ROSclient, "/action_groups_data", "std_msgs/String")
+action = roslibpy.Topic(ROSclient, '/app/set_action', 'std_msgs/String')
 
 
 def get_files_in_directory(directory_path):
@@ -49,25 +54,9 @@ def photo_cln(folder_path):
             print(f"Dell error {file_path}: {e}")
 
 
-ROSBRIDGE_IP = "127.0.0.1"
-ROSBRIDGE_PORT = 9090
-
 mcp = FastMCP("ros-mcp-server")
-ws_manager = WebSocketManager(ROSBRIDGE_IP, ROSBRIDGE_PORT)
-
 actions_groups_data: dict[str, str] = None
 
-@mcp.tool()
-def get_topics():
-    
-    ws_manager.connect()
-    topic_info = ws_manager.ws.get_topics()
-    ws_manager.close()
-
-    if topic_info:
-       return list(topic_info)
-    else:
-        return "No topics found"
 
 @mcp.tool(description="This tool makes a robot move by one step in any direction." \
 "Tool uses joystick emulate [z][x] -1.0 for right, 1.0 for left, -1.0 for backward, 1.0 for forward")
@@ -85,14 +74,14 @@ def make_step(x: float, z: float):
         'buttons': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     }
 
-    ws_manager.send('/joy', 'sensor_msgs/Joy', message)
+    joy.publish(message)
 
     message_to_stop = {
         'axes': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         'buttons': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     }
 
-    ws_manager.send('/joy', 'sensor_msgs/Joy', message_to_stop)
+    joy.publish(message_to_stop)
 
     return "one step!"
 
@@ -102,14 +91,6 @@ def defend(rotate: float, UPDOWN: float):
     # Clamp values between -1.0 and 1.0
     rotate_fx = max(-1.2, min(1.2, rotate))
     UPDOWN_fx = max(-0.3, min(0.2, UPDOWN))
-
-    client = roslibpy.Ros(host='localhost', port=9090)
-    client.run()
-    time.sleep(0.5)
-
-    pan = roslibpy.Topic(client, '/head_pan_controller/command', 'std_msgs/Float64')
-    tilt = roslibpy.Topic(client, '/head_tilt_controller/command', 'std_msgs/Float64')
-    joy = roslibpy.Topic(client, '/joy', 'sensor_msgs/Joy')
 
     panmsg = roslibpy.Message({
         'position': rotate_fx,
@@ -149,10 +130,9 @@ def defend(rotate: float, UPDOWN: float):
     tilt.publish(headZeroMsg)
     time.sleep(0.5)
 
-    joy.unadvertise()
-    tilt.unadvertise()
-    pan.unadvertise()
-    client.terminate()
+    #joy.unadvertise()
+    #tilt.unadvertise()
+    #pan.unadvertise()
 
 
     return "one less threat!"
@@ -166,27 +146,19 @@ def get_available_actions():
     global actions_groups_data  # Needed to modify the global variable
     actions_groups_data = None  # Reset before use
     
-    ws_manager.connect()
-
-    # topic for read
-    topic = roslibpy.Topic(
-        ws_manager.ws,
-        "/action_groups_data",
-        "std_msgs/String"
-    )
-
+    
     def on_action_received(msg):
         global actions_groups_data
         actions_groups_data = msg
 
-    topic.subscribe(on_action_received)
+    actionlist.subscribe(on_action_received)
 
     start_time = time.time()
     while actions_groups_data is None and (time.time() - start_time) < 5:
         time.sleep(0.1)
 
-    topic.unsubscribe()
-    ws_manager.close()
+    actionlist.unsubscribe()
+    
 
     if actions_groups_data:
         return list(actions_groups_data.items())  # Convert dict to list of tuples
@@ -200,18 +172,13 @@ def run_action(action_name: str):
         'data': action_name
     })
 
-    return ws_manager.send('app/set_action', 'std_msgs/String', message)
+    return action.publish(message)
 
 @mcp.tool(description="This tool used to get raw image from robot and save on user pc on directory like downloads")
 def get_image():
-    ws_manager.connect()
-
-    image_topic = roslibpy.Topic(
-        ws_manager.ws,
-        '/camera/image_raw',
-        'sensor_msgs/Image'
-    )
     
+
+    #TODO IN sniper game back images on 1 side only. I thn what it error from subscriber
     try:
         received_msg = None
 
@@ -255,14 +222,13 @@ def get_image():
 
         timestamp = str(len(items))
         save_path = downloads_dir +"/"+ f"image_{timestamp}.png"
-        #Path(save_path).parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(save_path), img_cv)
-        #os.startfile(save_path)
+
         
         print(f"[Image] Saved to {save_path}")
 
         image_topic.unsubscribe()
-        ws_manager.close()
+        
         return img_cv
 
     except Exception as e:
@@ -274,31 +240,28 @@ def get_image():
 "Tool use one string param, it is description of target to shoot")
 def sniper(targediscr:str):
 
-
+    print("startsnipet tool")
     photo_cln("photos/environment")
-    client = roslibpy.Ros(host='localhost', port=9090)
-    client.run()
-    time.sleep(0.5)
 
-    pan = roslibpy.Topic(client, '/head_pan_controller/command', 'std_msgs/Float64')
-    joy = roslibpy.Topic(client, '/joy', 'sensor_msgs/Joy')
+    pan = roslibpy.Topic(ROSclient, '/head_pan_controller/command', 'std_msgs/Float64')
+    joy = roslibpy.Topic(ROSclient, '/joy', 'sensor_msgs/Joy')
 
     fmsg=[]
 
     fmsg.append(roslibpy.Message({
         'position': 1.2,
-        'duration': 0.5,
+        'duration': 0.3,
     }))
 
 
     fmsg.append(roslibpy.Message({
         'position': 0,
-        'duration': 0.5,
+        'duration': 0.3,
     }))
 
     fmsg.append(roslibpy.Message({
         'position': -1.2,
-        'duration': 0.5,
+        'duration': 0.3,
     }))
 
 
@@ -314,17 +277,17 @@ def sniper(targediscr:str):
     })
 
     pan.publish(fmsg[0])    
-    time.sleep(1)
+    time.sleep(0.65)
     get_image()
-    time.sleep(1)
+    time.sleep(0.3)
     pan.publish(fmsg[1])    
-    time.sleep(1)
+    time.sleep(0.65)
     get_image()
-    time.sleep(1)
+    time.sleep(0.3)
     pan.publish(fmsg[2])    
-    time.sleep(1)
+    time.sleep(0.65)
     get_image()
-    time.sleep(1)
+    time.sleep(0.3)
     pan.publish(fmsg[1])
 
 
@@ -368,7 +331,7 @@ def sniper(targediscr:str):
     )
 
     pan.publish(fmsg[int(respons.choices[0].message.content)])    
-    time.sleep(0.8)
+    time.sleep(0.5)
        
     
 
@@ -381,8 +344,9 @@ def sniper(targediscr:str):
 
     joy.unadvertise()
     pan.unadvertise()
-    client.terminate()
     return 
 
 if __name__ == "__main__":
+    ROSclient.run()
+    time.sleep(0.5)
     mcp.run(transport="streamable-http")

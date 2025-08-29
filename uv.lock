@@ -1631,6 +1631,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pvrecorder"
+version = "1.2.7"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/7b/93/972f2500bca8e2b7807f2c6232504df4f1b82db546e42fdd2de109b98032/pvrecorder-1.2.7.tar.gz", hash = "sha256:f60b2174bff317c4349a916f59b5e71914a120f8313a9458f9ee25b89a800c75", size = 4128384, upload-time = "2025-03-28T20:53:21.841Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f6/4c/b1706065a9b52efa9a23e3822076b8916de2ff26036b6ff1474d90f95c95/pvrecorder-1.2.7-py3-none-any.whl", hash = "sha256:72c44be78069be92a602b0dfad42fbdc62b536f47c151e62076ee49ba877dfb0", size = 4131531, upload-time = "2025-03-28T20:53:19.662Z" },
+]
+
+[[package]]
 name = "pvrhino"
 version = "3.0.5"
 source = { registry = "https://pypi.org/simple" }
@@ -1939,6 +1948,7 @@ dependencies = [
     { name = "picovoice" },
     { name = "pveagle" },
     { name = "pvporcupine" },
+    { name = "pvrecorder" },
     { name = "pyaudio" },
     { name = "pygame" },
     { name = "roslibpy" },
@@ -1958,6 +1968,7 @@ requires-dist = [
     { name = "picovoice", specifier = ">=0.8.0" },
     { name = "pveagle", specifier = ">=1.0.4" },
     { name = "pvporcupine", specifier = ">=3.0.5" },
+    { name = "pvrecorder", specifier = ">=1.2.7" },
     { name = "pyaudio", specifier = ">=0.2.14" },
     { name = "pygame", specifier = ">=2.6.1" },
     { name = "roslibpy" },

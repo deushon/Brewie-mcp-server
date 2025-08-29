@@ -3,7 +3,6 @@ import os
 import json
 import tempfile
 import time
-from utils.websocket_manager import WebSocketManager
 import speech_recognition as sr
 from gtts import gTTS
 import pygame
@@ -15,6 +14,8 @@ import threading
 from hashlib import md5
 import roslibpy
 
+from pvrecorder import PvRecorder
+
 # ==============================
 # Проба замены метода активации
 # ==============================
@@ -23,6 +24,10 @@ import pvporcupine
 # Твой API ключ от Picovoice
 
 ACCESSW_KEY = os.getenv("WAKEUP_API_KEY")
+
+MCP_HOST="http://127.0.0.1:8000/mcp"
+
+MCP_http_client = Client(MCP_HOST)
 
 # Пути к твоим .ppn файлам (ключи-слова)
 KEYWORD_PATHS = [
@@ -128,8 +133,8 @@ def recognize_speech_from_mic(recognizer, microphone):
 async def call_mcp_tool(tool_name: str, parameters: dict):
     """Вызывает инструмент MCP-сервера через FastMCP"""
     try:
-        async with Client("http://127.0.0.1:8000/mcp/") as client:
-            result = await client.call_tool(tool_name, parameters)
+        async with MCP_http_client:
+            result = await MCP_http_client.call_tool(tool_name, parameters)
             print(f"[MCP] Result for {tool_name}: {result}")
             return True, result
     except Exception as e:
@@ -151,8 +156,8 @@ async def init_system_prompt():
 
     tools = []
     try:
-        async with Client("http://127.0.0.1:8000/mcp/") as mcp_client:
-            tools = await mcp_client.list_tools()
+        async with MCP_http_client:
+            tools = await MCP_http_client.list_tools()
     except Exception as e:
         print(f"[LLM] Не могу получить список инструментов: {e}")
         tools = []
@@ -338,7 +343,6 @@ async def main():
     recognizer = sr.Recognizer()
     mic = sr.Microphone()
 
-    action.publish(standBmsg)
     pan.publish(panFXmsg)
 
     speak_with_gtts("I am ready")
@@ -360,21 +364,18 @@ async def main():
     # Создаем экземпляр Porcupine
     porcupine = pvporcupine.create(
         access_key=ACCESSW_KEY,
-        keyword_paths=KEYWORD_PATHS
+        keyword_paths=KEYWORD_PATHS,
+        sensitivities= [0.9]* len(KEYWORD_PATHS)
     )
 
     # Настройка аудио потока
-    pa = pyaudio.PyAudio()
-    audio_stream = pa.open(
-        rate=porcupine.sample_rate,
-        format=pyaudio.paInt16,
-        channels=1,
-        input=True,
-        frames_per_buffer=porcupine.frame_length
-    )
+    recorder = PvRecorder(
+        frame_length=porcupine.frame_length,
+        device_index=0)
+    recorder.start()
 
     #Словарь связанынй со стрельбой
-    search_words = ["save", "safe", "attack", "enemy", "opponent","fire"]
+    search_words = ["save", "safe", "attack", "enemy", "opponent","fire","snipe","sniper"]
     print(f"Say AiNex to start...")
     try:
         while True:
@@ -384,8 +385,7 @@ async def main():
                 if user_query:
                     await handle_conversation(user_query)
             
-            pcm = audio_stream.read(porcupine.frame_length)
-            pcm = struct.unpack_from("h" * porcupine.frame_length, pcm)
+            pcm = recorder.read()
 
             keyword_index = porcupine.process(pcm)
 
@@ -404,7 +404,7 @@ async def main():
                         time.sleep(0.5)
                         pan.publish(s2msg)
                     else:
-                        action.publish(thinkmsg)
+                        #action.publish(thinkmsg)
                         speak_with_gtts("Thinking...")
                     await handle_conversation(user_query)
                 else:
@@ -424,10 +424,6 @@ async def main():
         stop_tts()
         if 'porcupine' in locals():
             porcupine.delete()
-        if 'audio_stream' in locals():
-            audio_stream.close()
-        if 'pa' in locals():
-            pa.terminate()
 
 
 if __name__ == "__main__":

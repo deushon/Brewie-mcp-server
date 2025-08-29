@@ -20,4 +20,5 @@ dependencies = [
     "picovoice>=0.8.0",
     "matplotlib>=3.10.5",
     "pveagle>=1.0.4",
+    "pvrecorder>=1.2.7",
 ]
