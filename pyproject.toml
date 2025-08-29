@@ -18,4 +18,6 @@ dependencies = [
     "pyaudio>=0.2.14",
     "pvporcupine>=3.0.5",
     "picovoice>=0.8.0",
+    "matplotlib>=3.10.5",
+    "pveagle>=1.0.4",
 ]

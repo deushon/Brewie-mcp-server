@@ -1,3 +1,4 @@
+import argparse
 from mcp.server.fastmcp import FastMCP
 from typing import List, Any, Optional
 from pathlib import Path
@@ -14,7 +15,8 @@ import numpy as np
 from together import Together
 import base64
 
-#INTER API!!!
+
+LLMclient = Together()
 
 
 def get_files_in_directory(directory_path):
@@ -383,4 +385,4 @@ def sniper(targediscr:str):
     return 
 
 if __name__ == "__main__":
-    mcp.run(transport="stdio")
+    mcp.run(transport="streamable-http")

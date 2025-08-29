@@ -22,13 +22,6 @@ import pvporcupine
 
 # Твой API ключ от Picovoice
 
-# RASP ACCESS_KEY = '+cs716sY8uf8TNQLnIRV4oh58560fYNC1pOFgcf8rbP0FpVYGg4lEw==' 'Ai-Nex_en_raspberry-pi_v3_0_0.ppn'
-# Windows
-
-
-
-
-
 ACCESSW_KEY = os.getenv("WAKEUP_API_KEY")
 
 # Пути к твоим .ppn файлам (ключи-слова)
@@ -135,7 +128,7 @@ def recognize_speech_from_mic(recognizer, microphone):
 async def call_mcp_tool(tool_name: str, parameters: dict):
     """Вызывает инструмент MCP-сервера через FastMCP"""
     try:
-        async with Client("server.py") as client:
+        async with Client("http://127.0.0.1:8000/mcp/") as client:
             result = await client.call_tool(tool_name, parameters)
             print(f"[MCP] Result for {tool_name}: {result}")
             return True, result
@@ -158,7 +151,7 @@ async def init_system_prompt():
 
     tools = []
     try:
-        async with Client("server.py") as mcp_client:
+        async with Client("http://127.0.0.1:8000/mcp/") as mcp_client:
             tools = await mcp_client.list_tools()
     except Exception as e:
         print(f"[LLM] Не могу получить список инструментов: {e}")
