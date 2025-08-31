@@ -56,29 +56,36 @@ message_history = []
 history_active = False
 text_input = False
 
+def get_files_in_directory(directory_path):
+
+  files = []
+  for item in os.listdir(directory_path):
+    item_path = os.path.join(directory_path, item)
+    if os.path.isfile(item_path):
+      files.append(item)
+  return files
+
+
 def speak_with_gtts(text: str):
     """Озвучивает текст с помощью gTTS и pygame. Поддерживает кеширование."""
     print(f"[TTS] Speech: {text}")
-"""
+    filelist=get_files_in_directory("audio_out")
     # Хэшируем текст для ключа в кеше
-    text_hash = md5(text.encode("utf-8")).hexdigest()
+    #text_hash = md5(text.encode("utf-8")).hexdigest()
     
-    with cache_lock:
-        if text_hash in tts_cache:
-            audio_file = tts_cache[text_hash]
-            print(f"[TTS] Using cached audio for: {text}")
-        else:
-            # Создаем временный файл и сохраняем речь
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmpfile:
-                tts = gTTS(text=text, lang="en", slow=False)
-                tts.save(tmpfile.name)
-                audio_file = tmpfile.name
-                tts_cache[text_hash] = audio_file
-                print(f"[TTS] Generated new audio for: {text}")
+    if text in filelist:
+        audio_file = "audio_out/"+text
+        print(f"[TTS] Using cached audio for: {text}")
+    else:
+        # Создаем временный файл и сохраняем речь
+        tts = gTTS(text=text, lang="en", slow=False)
+        tts.save("audio_out/"+text)
+        audio_file = "audio_out/"+text
+        print(f"[TTS] Generated new audio for: {text}")
 
     # Проигрываем в отдельном потоке
     threading.Thread(target=play_audio, args=(audio_file,)).start()
-"""
+
 
 def play_audio(file_path: str):
     """Проигрывает аудиофайл через pygame"""
