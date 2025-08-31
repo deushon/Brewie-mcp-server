@@ -59,7 +59,7 @@ text_input = False
 def speak_with_gtts(text: str):
     """Озвучивает текст с помощью gTTS и pygame. Поддерживает кеширование."""
     print(f"[TTS] Speech: {text}")
-
+"""
     # Хэшируем текст для ключа в кеше
     text_hash = md5(text.encode("utf-8")).hexdigest()
     
@@ -78,7 +78,7 @@ def speak_with_gtts(text: str):
 
     # Проигрываем в отдельном потоке
     threading.Thread(target=play_audio, args=(audio_file,)).start()
-
+"""
 
 def play_audio(file_path: str):
     """Проигрывает аудиофайл через pygame"""
@@ -255,14 +255,24 @@ async def handle_conversation(user_input: str):
             for command in commands:
                 if not isinstance(command, dict):
                     continue
-                    
-                tool_name = command.get("tool")
-                params = command.get("params", {})
                 
+                master_talk = True
+                
+                permissions = False
+                params = command.get("params", {})
+
+                tool_name = command.get("tool")
+                if ((tool_name == "sniper" or tool_name =="defend") and master_talk) or (tool_name != "sniper" and tool_name !=  "defend"):
+                    permissions = True
+            
+                print(permissions)
                 if tool_name:
-                    success, result = await call_mcp_tool(tool_name, params)
-                    if not success:
-                        speak_with_gtts(f"Failed to execute {tool_name}")
+                    if permissions:
+                        success, result = await call_mcp_tool(tool_name, params )
+                        if not success:
+                            speak_with_gtts(f"Failed to execute {tool_name}")
+                    else:
+                        speak_with_gtts("You do not have permission to perform this action.")
                 else:
                     print("[LLM] Missing tool name in command")
                     
@@ -345,8 +355,8 @@ async def main():
 
     pan.publish(panFXmsg)
 
+ 
     speak_with_gtts("I am ready")
-    
     tilt.publish(headUPmsg)
     time.sleep(1)
     tilt.publish(headDOWNmsg)
@@ -371,7 +381,8 @@ async def main():
     # Настройка аудио потока
     recorder = PvRecorder(
         frame_length=porcupine.frame_length,
-        device_index=0)
+        #device_index=1
+        )
     recorder.start()
 
     #Словарь связанынй со стрельбой
