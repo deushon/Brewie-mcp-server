@@ -186,5 +186,7 @@ uv.lock
 output.wav
 robot_en_raspberry-pi_v3_0_0.ppn
 photos
-audio_out
+audio_out/*
+audio_in/*
 
+master_sh/master_voice

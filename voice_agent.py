@@ -13,6 +13,10 @@ import struct
 import threading
 from hashlib import md5
 import roslibpy
+import subprocess
+import re
+
+import io
 
 from pvrecorder import PvRecorder
 
@@ -24,6 +28,19 @@ import pvporcupine
 # Твой API ключ от Picovoice
 
 ACCESSW_KEY = os.getenv("WAKEUP_API_KEY")
+
+
+regcommand = [
+    'eagle_demo_mic',
+    'enroll',
+    '--access_key',
+    ACCESSW_KEY,
+    '--output_profile_path',
+    'master_sh/master_voice'
+]
+
+
+
 
 MCP_HOST="http://127.0.0.1:8000/mcp"
 
@@ -70,8 +87,6 @@ def speak_with_gtts(text: str):
     """Озвучивает текст с помощью gTTS и pygame. Поддерживает кеширование."""
     print(f"[TTS] Speech: {text}")
     filelist=get_files_in_directory("audio_out")
-    # Хэшируем текст для ключа в кеше
-    #text_hash = md5(text.encode("utf-8")).hexdigest()
     
     if text in filelist:
         audio_file = "audio_out/"+text
@@ -128,8 +143,16 @@ def recognize_speech_from_mic(recognizer, microphone):
         print("I'm listening...")
         audio = recognizer.listen(source)
 
+
     try:
-        return recognizer.recognize_google(audio, language="en-US").lower()
+        usersp = recognizer.recognize_google(audio, language="en-US").lower()
+        wav_data = audio.get_wav_data()
+
+        with open("audio_in/"+usersp, "wb") as f:
+            f.write(wav_data)
+
+        
+        return usersp
     except sr.UnknownValueError:
         return None
 
@@ -258,13 +281,60 @@ async def handle_conversation(user_input: str):
             commands = response_data.get("commands", [])
             if not isinstance(commands, list):
                 commands = [commands]
+            master_talk = False
+            actrig = False
+            for command in commands:
+                tool_name = command.get("tool")
+                if (tool_name == "sniper" or tool_name =="defend"):
+                    actrig = True
                 
+            if actrig:
+                checkcommand = [
+                    'eagle_demo_file',
+                    'test',
+                    '--access_key',
+                    ACCESSW_KEY,
+                    '--input_profile_paths',
+                    'master_sh/master_voice',
+                    '--test_audio_path',
+                    'audio_in/'+user_input
+                ]
+                egrez=subprocess.run(checkcommand, check=True, capture_output=True, text=True)
+
+                lines = egrez.stdout.strip().split('\n')
+                parsed_data = []
+
+                # Регулярное выражение для поиска времени и оценки
+                pattern = r"time: (\d+\.\d+) sec \| scores -> `master_voice`: (\d+\.\d+)"
+
+                for line in lines:
+                    match = re.search(pattern, line)
+                    if match:
+                        time = float(match.group(1))
+                        score = float(match.group(2))
+                        parsed_data.append({'time': time, 'score': score})
+
+
+                scores = [item['score'] for item in parsed_data if item['score'] != 0]
+                print (scores)
+                if(len(scores)>0):
+                    average_score = sum(scores) / len(scores)
+                else:
+                    average_score=0
+                print("The authenticity of the master's identity:")
+                print(average_score)
+
+                if(average_score>0.1):
+                    master_talk = True
+
+
+            errAc=False    
             for command in commands:
                 if not isinstance(command, dict):
                     continue
                 
-                master_talk = True
                 
+
                 permissions = False
                 params = command.get("params", {})
 
@@ -280,6 +350,7 @@ async def handle_conversation(user_input: str):
                             speak_with_gtts(f"Failed to execute {tool_name}")
                     else:
                         speak_with_gtts("You do not have permission to perform this action.")
+                        errAc=True
                 else:
                     print("[LLM] Missing tool name in command")
                     
@@ -289,7 +360,8 @@ async def handle_conversation(user_input: str):
 
             # Озвучиваем ответ
             verbal_response = response_data.get("answer", "I'll execute your request")
-            speak_with_gtts(verbal_response)
+            if not errAc:
+                speak_with_gtts(verbal_response)
 
 
         except json.JSONDecodeError as e:
@@ -358,15 +430,32 @@ async def main():
 
 
     recognizer = sr.Recognizer()
-    mic = sr.Microphone()
+    mic = sr.Microphone(sample_rate=16000)
 
     pan.publish(panFXmsg)
 
- 
-    speak_with_gtts("I am ready")
+
+    filelist=get_files_in_directory("master_sh")
+
     tilt.publish(headUPmsg)
+    
+    if "master_voice" not in filelist:     
+        speak_with_gtts("Welcome new master ")
+        time.sleep(1.6)
+        speak_with_gtts("Tell me a little about yourself so I can remember your voice.")
+        time.sleep(4.2)
+        #TODO Обрабокта ошибок
+        subprocess.run(regcommand, check=True, capture_output=True, text=True)
+        speak_with_gtts("New master registered!")
+        time.sleep(2)
+    
+    
+        
+    
+    speak_with_gtts("I am ready")
     time.sleep(1)
     tilt.publish(headDOWNmsg)
+
 
 
     
@@ -413,7 +502,7 @@ async def main():
             if keyword_index >= 0:
                 print("Wake word detected!")
                 tilt.publish(headUPmsg)
-                speak_with_gtts("Yes?")
+                #speak_with_gtts("Yes?")
                 print("Listening for command...")
                 user_query = recognize_speech_from_mic(recognizer, mic)
                 if user_query:       
@@ -428,9 +517,14 @@ async def main():
                         #action.publish(thinkmsg)
                         speak_with_gtts("Thinking...")
                     await handle_conversation(user_query)
+                    pan.publish(panFXmsg)
+                    tilt.publish(panFXmsg)
+
                 else:
                     speak_with_gtts("I didn't catch that")
                     tilt.publish(headDOWNmsg)
+                    pan.publish(panFXmsg)
+
                     
     except KeyboardInterrupt:
         print("\n User stop")

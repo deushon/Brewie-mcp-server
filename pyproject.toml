@@ -21,4 +21,5 @@ dependencies = [
     "matplotlib>=3.10.5",
     "pveagle>=1.0.4",
     "pvrecorder>=1.2.7",
+    "pydub>=0.25.1",
 ]
