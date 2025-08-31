@@ -19,10 +19,28 @@ ROSclient = roslibpy.Ros(host='localhost', port=9090)
 pan = roslibpy.Topic(ROSclient, '/head_pan_controller/command', 'std_msgs/Float64')
 tilt = roslibpy.Topic(ROSclient, '/head_tilt_controller/command', 'std_msgs/Float64')
 joy = roslibpy.Topic(ROSclient, '/joy', 'sensor_msgs/Joy')
-image_topic = roslibpy.Topic(ROSclient, '/camera/image_raw', 'sensor_msgs/Image')
+image_topic = roslibpy.Topic(ROSclient, '/camera/image_raw/compressed', 'sensor_msgs/CompressedImage',queue_size=1,queue_length=1)
 actionlist = roslibpy.Topic(ROSclient, "/action_groups_data", "std_msgs/String")
 action = roslibpy.Topic(ROSclient, '/app/set_action', 'std_msgs/String')
 
+
+class CameraSubscriber:
+    def __init__(self, Rclient, imTop):
+        self.last_image = None
+        self.client = Rclient
+        self.image_topic = imTop
+
+    def on_image_received(self, message):
+        # Колбэк, который вызывается при получении нового сообщения
+        self.last_image = message
+
+    def get_last_image(self):
+        # Метод, который возвращает последний сохраненный снимок
+        return self.last_image
+    def subs(self):
+        self.image_topic.subscribe(self.on_image_received)
+
+Csubscriber = CameraSubscriber(ROSclient,image_topic)
 
 def get_files_in_directory(directory_path):
 
@@ -176,17 +194,10 @@ def run_action(action_name: str):
 
 @mcp.tool(description="This tool used to get raw image from robot and save on user pc on directory like downloads")
 def get_image():
-    
-
     #TODO IN sniper game back images on 1 side only. I thn what it error from subscriber
     try:
-        received_msg = None
-
-        def on_image_received(msg):
-            nonlocal received_msg
-            received_msg = msg
-
-        image_topic.subscribe(on_image_received)
+        # Получаем последнее сообщение.
+        received_msg = Csubscriber.get_last_image()
 
         start_time = time.time()
         while received_msg is None and (time.time() - start_time) < 5:
@@ -194,47 +205,68 @@ def get_image():
 
         if received_msg is None:
             print("[Image] No data received from subscriber")
-            image_topic.unsubscribe()
             return "No data"
 
         msg = received_msg
 
-        height = msg["height"]
-        width = msg["width"]
-        encoding = msg["encoding"]
-        data_b64 = msg["data"]
-        image_bytes = base64.b64decode(data_b64)
-        img_np = np.frombuffer(image_bytes, dtype=np.uint8)
+        # Проверяем, является ли формат сжатым.
+        if 'format' in msg and 'data' in msg:
+            # Обработка сжатого изображения (CompressedImage)
+            
+            # Декодируем данные Base64
+            data_b64 = msg['data']
+            image_bytes = base64.b64decode(data_b64)
+            
+            # Преобразуем массив байтов в NumPy-массив
+            img_np = np.frombuffer(image_bytes, np.uint8)
+            
+            # Декодируем изображение из JPEG/PNG с помощью OpenCV
+            img_cv = cv2.imdecode(img_np, cv2.IMREAD_UNCHANGED)
+            
+            if img_cv is None:
+                print(f"[Image] Failed to decode image with OpenCV.")
+                return "Decoding error"
 
-        if encoding == "rgb8":
-            img_np = img_np.reshape((height, width, 3))
-            img_cv = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-        elif encoding == "bgr8":
-            img_cv = img_np.reshape((height, width, 3))
-        elif encoding == "mono8":
-            img_cv = img_np.reshape((height, width))
+        elif 'height' in msg and 'width' in msg and 'encoding' in msg:
+            # Обработка несжатого изображения (Image)
+            height = msg["height"]
+            width = msg["width"]
+            encoding = msg["encoding"]
+            data_b64 = msg["data"]
+            image_bytes = base64.b64decode(data_b64)
+            img_np = np.frombuffer(image_bytes, dtype=np.uint8)
+
+            if encoding == "rgb8":
+                img_np = img_np.reshape((height, width, 3))
+                img_cv = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+            elif encoding == "bgr8":
+                img_cv = img_np.reshape((height, width, 3))
+            elif encoding == "mono8":
+                img_cv = img_np.reshape((height, width))
+            else:
+                print(f"[Image] Unsupported encoding: {encoding}")
+                return "Format error"
         else:
-            print(f"[Image] Unsupported encoding: {encoding}")
-            image_topic.unsubscribe()
+            print("[Image] Unsupported message format.")
             return "Format error"
+
         downloads_dir = "photos/environment"
+        # Убедимся, что директория существует.
+        os.makedirs(downloads_dir, exist_ok=True)
         items = os.listdir(downloads_dir)
 
         timestamp = str(len(items))
-        save_path = downloads_dir +"/"+ f"image_{timestamp}.png"
+        save_path = os.path.join(downloads_dir, f"image_{timestamp}.png")
         cv2.imwrite(str(save_path), img_cv)
 
-        
         print(f"[Image] Saved to {save_path}")
 
-        image_topic.unsubscribe()
-        
         return img_cv
 
     except Exception as e:
-        if 'image_topic' in locals():
-            image_topic.unsubscribe()
-        return "[Image] Failed to receive or decode: "
+        print(f"[Image] Failed to receive or decode: {e}")
+        return "Failure"
+
     
 @mcp.tool(description="This tool allows you to play sniper unlike the defender tool here the person says the description of the target and not its position, where it is the robot decides itself" \
 "Tool use one string param, it is description of target to shoot")
@@ -279,15 +311,12 @@ def sniper(targediscr:str):
     pan.publish(fmsg[0])    
     time.sleep(0.65)
     get_image()
-    time.sleep(0.3)
     pan.publish(fmsg[1])    
     time.sleep(0.65)
     get_image()
-    time.sleep(0.3)
     pan.publish(fmsg[2])    
     time.sleep(0.65)
     get_image()
-    time.sleep(0.3)
     pan.publish(fmsg[1])
 
 
@@ -349,4 +378,5 @@ def sniper(targediscr:str):
 if __name__ == "__main__":
     ROSclient.run()
     time.sleep(0.5)
+    Csubscriber.subs()
     mcp.run(transport="streamable-http")

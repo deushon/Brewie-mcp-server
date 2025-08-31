@@ -376,14 +376,17 @@ async def main():
 
     #Словарь связанынй со стрельбой
     search_words = ["save", "safe", "attack", "enemy", "opponent","fire","snipe","sniper"]
-    print(f"Say AiNex to start...")
+    print(f"Say Robot to start...")
     try:
         while True:
 
             if text_input:
                 user_query = input(str(""))
-                if user_query:
-                    await handle_conversation(user_query)
+                if user_query == "p":
+                    await call_mcp_tool("get_image", "")
+                if user_query == "s":
+                    scom = {'targediscr': 'purle ball'}
+                    await call_mcp_tool("sniper", scom)
             
             pcm = recorder.read()
 
