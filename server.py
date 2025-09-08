@@ -3,7 +3,7 @@ from typing import List, Any, Optional
 from pathlib import Path
 import time
 import os
-import roslibpy
+import rospy
 import base64
 import cv2
 from datetime import datetime
@@ -12,23 +12,35 @@ import numpy as np
 from together import Together
 import base64
 
+# ROS message types
+from std_msgs.msg import Float64, String
+from sensor_msgs.msg import Joy, CompressedImage, Image
+from cv_bridge import CvBridge
 
 LLMclient = Together()
-ROSclient = roslibpy.Ros(host='localhost', port=9090)
 
-pan = roslibpy.Topic(ROSclient, '/head_pan_controller/command', 'std_msgs/Float64')
-tilt = roslibpy.Topic(ROSclient, '/head_tilt_controller/command', 'std_msgs/Float64')
-joy = roslibpy.Topic(ROSclient, '/joy', 'sensor_msgs/Joy')
-image_topic = roslibpy.Topic(ROSclient, '/camera/image_raw/compressed', 'sensor_msgs/CompressedImage',queue_size=1,queue_length=1)
-actionlist = roslibpy.Topic(ROSclient, "/action_groups_data", "std_msgs/String")
-action = roslibpy.Topic(ROSclient, '/app/set_action', 'std_msgs/String')
+# Initialize ROS node
+rospy.init_node('brewie_mcp_server', anonymous=True)
+
+# Publishers
+pan_pub = rospy.Publisher('/head_pan_controller/command', Float64, queue_size=1)
+tilt_pub = rospy.Publisher('/head_tilt_controller/command', Float64, queue_size=1)
+joy_pub = rospy.Publisher('/joy', Joy, queue_size=1)
+action_pub = rospy.Publisher('/app/set_action', String, queue_size=1)
+
+# Subscribers will be created in the CameraSubscriber class
+image_topic_name = '/camera/image_raw/compressed'
+actionlist_topic_name = "/action_groups_data"
+
+# CV Bridge for image conversion
+bridge = CvBridge()
 
 
 class CameraSubscriber:
-    def __init__(self, Rclient, imTop):
+    def __init__(self, topic_name):
         self.last_image = None
-        self.client = Rclient
-        self.image_topic = imTop
+        self.topic_name = topic_name
+        self.subscriber = None
 
     def on_image_received(self, message):
         # Колбэк, который вызывается при получении нового сообщения
@@ -37,10 +49,11 @@ class CameraSubscriber:
     def get_last_image(self):
         # Метод, который возвращает последний сохраненный снимок
         return self.last_image
+    
     def subs(self):
-        self.image_topic.subscribe(self.on_image_received)
+        self.subscriber = rospy.Subscriber(self.topic_name, CompressedImage, self.on_image_received, queue_size=1)
 
-Csubscriber = CameraSubscriber(ROSclient,image_topic)
+Csubscriber = CameraSubscriber(image_topic_name)
 
 def get_files_in_directory(directory_path):
 
@@ -87,19 +100,19 @@ def make_step(x: float, z: float):
     right_left = max(-1.0, min(1.0, right_left))
     forward_backward = max(-1.0, min(1.0, forward_backward))
     
-    message = {
-        'axes': [right_left, forward_backward, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        'buttons': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    }
+    # Create Joy message
+    message = Joy()
+    message.axes = [right_left, forward_backward, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    message.buttons = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    joy.publish(message)
+    joy_pub.publish(message)
 
-    message_to_stop = {
-        'axes': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        'buttons': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    }
+    # Create stop message
+    message_to_stop = Joy()
+    message_to_stop.axes = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    message_to_stop.buttons = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    joy.publish(message_to_stop)
+    joy_pub.publish(message_to_stop)
 
     return "one step!"
 
@@ -110,48 +123,36 @@ def defend(rotate: float, UPDOWN: float):
     rotate_fx = max(-1.2, min(1.2, rotate))
     UPDOWN_fx = max(-0.3, min(0.2, UPDOWN))
 
-    panmsg = roslibpy.Message({
-        'position': rotate_fx,
-        'duration': 0.5,
-    })
+    # Create Float64 messages for pan and tilt
+    panmsg = Float64()
+    panmsg.data = rotate_fx
 
-    tiltmsg = roslibpy.Message({
-        'position': UPDOWN_fx,
-        'duration': 0.5,
-    })
+    tiltmsg = Float64()
+    tiltmsg.data = UPDOWN_fx
 
+    headZeroMsg = Float64()
+    headZeroMsg.data = 0.0
 
-    headZeroMsg = roslibpy.Message({
-        'position': 0,
-        'duration': 0.5,
-    })
+    # Create Joy messages
+    defStarmsg = Joy()
+    defStarmsg.axes = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    defStarmsg.buttons = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    defStarmsg = roslibpy.Message({
-        'axes': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        'buttons': [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    })
+    defEndmsg = Joy()
+    defEndmsg.axes = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    defEndmsg.buttons = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    defEndmsg = roslibpy.Message({
-        'axes': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        'buttons': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    })
-
-    pan.publish(panmsg)    
-    tilt.publish(tiltmsg)
+    pan_pub.publish(panmsg)    
+    tilt_pub.publish(tiltmsg)
     time.sleep(0.8)
-    joy.publish(defStarmsg)
+    joy_pub.publish(defStarmsg)
     time.sleep(1.2)
-    joy.publish(defEndmsg)
+    joy_pub.publish(defEndmsg)
     time.sleep(0.1)
-    pan.publish(headZeroMsg)
+    pan_pub.publish(headZeroMsg)
     time.sleep(0.1)
-    tilt.publish(headZeroMsg)
+    tilt_pub.publish(headZeroMsg)
     time.sleep(0.5)
-
-    #joy.unadvertise()
-    #tilt.unadvertise()
-    #pan.unadvertise()
-
 
     return "one less threat!"
 
@@ -164,33 +165,39 @@ def get_available_actions():
     global actions_groups_data  # Needed to modify the global variable
     actions_groups_data = None  # Reset before use
     
-    
     def on_action_received(msg):
         global actions_groups_data
-        actions_groups_data = msg
+        actions_groups_data = msg.data
 
-    actionlist.subscribe(on_action_received)
+    # Create subscriber
+    actionlist_sub = rospy.Subscriber(actionlist_topic_name, String, on_action_received)
 
     start_time = time.time()
     while actions_groups_data is None and (time.time() - start_time) < 5:
         time.sleep(0.1)
 
-    actionlist.unsubscribe()
+    # Unsubscribe
+    actionlist_sub.unregister()
     
-
     if actions_groups_data:
-        return list(actions_groups_data.items())  # Convert dict to list of tuples
+        # Parse the string data as JSON if it's in JSON format
+        import json
+        try:
+            parsed_data = json.loads(actions_groups_data)
+            return list(parsed_data.items())  # Convert dict to list of tuples
+        except:
+            # If not JSON, return as single item
+            return [(actions_groups_data, "action")]
     else:
         return []
 
 @mcp.tool(description="This tool run action")
 def run_action(action_name: str):
+    message = String()
+    message.data = action_name
 
-    message = ({
-        'data': action_name
-    })
-
-    return action.publish(message)
+    action_pub.publish(message)
+    return "Action published: " + action_name
 
 @mcp.tool(description="This tool used to get raw image from robot and save on user pc on directory like downloads")
 def get_image():
@@ -210,11 +217,11 @@ def get_image():
         msg = received_msg
 
         # Проверяем, является ли формат сжатым.
-        if 'format' in msg and 'data' in msg:
+        if hasattr(msg, 'format') and hasattr(msg, 'data'):
             # Обработка сжатого изображения (CompressedImage)
             
             # Декодируем данные Base64
-            data_b64 = msg['data']
+            data_b64 = msg.data
             image_bytes = base64.b64decode(data_b64)
             
             # Преобразуем массив байтов в NumPy-массив
@@ -227,12 +234,12 @@ def get_image():
                 print(f"[Image] Failed to decode image with OpenCV.")
                 return "Decoding error"
 
-        elif 'height' in msg and 'width' in msg and 'encoding' in msg:
+        elif hasattr(msg, 'height') and hasattr(msg, 'width') and hasattr(msg, 'encoding'):
             # Обработка несжатого изображения (Image)
-            height = msg["height"]
-            width = msg["width"]
-            encoding = msg["encoding"]
-            data_b64 = msg["data"]
+            height = msg.height
+            width = msg.width
+            encoding = msg.encoding
+            data_b64 = msg.data
             image_bytes = base64.b64decode(data_b64)
             img_np = np.frombuffer(image_bytes, dtype=np.uint8)
 
@@ -275,49 +282,40 @@ def sniper(targediscr:str):
     print("startsnipet tool")
     photo_cln("photos/environment")
 
-    pan = roslibpy.Topic(ROSclient, '/head_pan_controller/command', 'std_msgs/Float64')
-    joy = roslibpy.Topic(ROSclient, '/joy', 'sensor_msgs/Joy')
+    # Create Float64 messages for pan positions
+    fmsg = []
+    
+    msg1 = Float64()
+    msg1.data = 1.2
+    fmsg.append(msg1)
 
-    fmsg=[]
+    msg2 = Float64()
+    msg2.data = 0.0
+    fmsg.append(msg2)
 
-    fmsg.append(roslibpy.Message({
-        'position': 1.2,
-        'duration': 0.3,
-    }))
+    msg3 = Float64()
+    msg3.data = -1.2
+    fmsg.append(msg3)
 
+    # Create Joy messages
+    defStarmsg = Joy()
+    defStarmsg.axes = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    defStarmsg.buttons = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    fmsg.append(roslibpy.Message({
-        'position': 0,
-        'duration': 0.3,
-    }))
+    defEndmsg = Joy()
+    defEndmsg.axes = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    defEndmsg.buttons = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    fmsg.append(roslibpy.Message({
-        'position': -1.2,
-        'duration': 0.3,
-    }))
-
-
-
-    defStarmsg = roslibpy.Message({
-        'axes': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        'buttons': [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    })
-
-    defEndmsg = roslibpy.Message({
-        'axes': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        'buttons': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    })
-
-    pan.publish(fmsg[0])    
+    pan_pub.publish(fmsg[0])    
     time.sleep(0.65)
     get_image()
-    pan.publish(fmsg[1])    
+    pan_pub.publish(fmsg[1])    
     time.sleep(0.65)
     get_image()
-    pan.publish(fmsg[2])    
+    pan_pub.publish(fmsg[2])    
     time.sleep(0.65)
     get_image()
-    pan.publish(fmsg[1])
+    pan_pub.publish(fmsg[1])
 
 
     getDescriptionPrompt = "You see 3 photos (0,1,2). Return only the number of the photo in which, in your opinion, the object most closely resembles " + targediscr + ". The answer should only be one digit without additional words."
@@ -359,24 +357,26 @@ def sniper(targediscr:str):
     }],
     )
 
-    pan.publish(fmsg[int(respons.choices[0].message.content)])    
+    pan_pub.publish(fmsg[int(respons.choices[0].message.content)])    
     time.sleep(0.5)
        
     
 
-    joy.publish(defStarmsg)
+    joy_pub.publish(defStarmsg)
     time.sleep(1.2)
-    joy.publish(defEndmsg)
+    joy_pub.publish(defEndmsg)
     time.sleep(1)    
-    pan.publish(fmsg[1])
+    pan_pub.publish(fmsg[1])
     time.sleep(0.1) 
 
-    joy.unadvertise()
-    pan.unadvertise()
-    return 
+    return "Sniper action completed" 
 
 if __name__ == "__main__":
-    ROSclient.run()
-    time.sleep(0.5)
+    # Initialize camera subscriber
     Csubscriber.subs()
+    
+    # Wait for ROS to be ready
+    time.sleep(0.5)
+    
+    # Run MCP server
     mcp.run(transport="streamable-http")
