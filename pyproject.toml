@@ -22,4 +22,9 @@ dependencies = [
     "pveagle>=1.0.4",
     "pvrecorder>=1.2.7",
     "pydub>=0.25.1",
+    "qrcode[pil]>=8.2",
+    "pyzbar>=0.1.9",
+    "base58>=2.1.1",
+    "solana>=0.30.2",
+    "solders>=0.21.0",
 ]

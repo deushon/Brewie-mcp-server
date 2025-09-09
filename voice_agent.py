@@ -71,8 +71,8 @@ tts_active = True
 
 message_history = []
 history_active = False
-text_input = False
-
+text_input = True
+ 
 def get_files_in_directory(directory_path):
 
   files = []
@@ -494,6 +494,9 @@ async def main():
                 if user_query == "s":
                     scom = {'targediscr': 'purle ball'}
                     await call_mcp_tool("sniper", scom)
+                if user_query == "t":
+                    scom = {'amount': 0.0001}
+                    await call_mcp_tool("BrewPay", scom)
             
             pcm = recorder.read()
 
