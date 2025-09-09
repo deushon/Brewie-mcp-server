@@ -21,11 +21,11 @@ import io
 from pvrecorder import PvRecorder
 
 # ==============================
-# Проба замены метода активации
+# Testing replacement of activation method
 # ==============================
 import pvporcupine
 
-# Твой API ключ от Picovoice
+# Your Picovoice API key
 
 ACCESSW_KEY = os.getenv("WAKEUP_API_KEY")
 
@@ -46,32 +46,32 @@ MCP_HOST="http://127.0.0.1:8000/mcp"
 
 MCP_http_client = Client(MCP_HOST)
 
-# Пути к твоим .ppn файлам (ключи-слова)
+# Paths to your .ppn files (wake words)
 KEYWORD_PATHS = [
     'robot_en_raspberry-pi_v3_0_0.ppn'
 ]
 # ==============================
-# Конфигурация
+# Configuration
 # ==============================
 
 WAKE_WORD = "nex"
 #MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
 MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 # ==============================
-# TTS функция
+# TTS function
 # ==============================
 
-# Кеш для аудиофайлов: {hash(text) -> путь_к_файлу}
+# Cache for audio files: {hash(text) -> file_path}
 tts_cache = {}
-# Блокировка для безопасного доступа к кешу из разных потоков
+# Lock for safe access to cache from different threads
 cache_lock = threading.Lock()
 
-# Флаг для завершения работы
+# Flag for completion of work
 tts_active = True
 
 message_history = []
 history_active = False
-text_input = True
+text_input = False
  
 def get_files_in_directory(directory_path):
 
@@ -84,7 +84,7 @@ def get_files_in_directory(directory_path):
 
 
 def speak_with_gtts(text: str):
-    """Озвучивает текст с помощью gTTS и pygame. Поддерживает кеширование."""
+    """Speaks text using gTTS and pygame. Supports caching."""
     print(f"[TTS] Speech: {text}")
     filelist=get_files_in_directory("audio_out")
     
@@ -92,20 +92,20 @@ def speak_with_gtts(text: str):
         audio_file = "audio_out/"+text
         print(f"[TTS] Using cached audio for: {text}")
     else:
-        # Создаем временный файл и сохраняем речь
+        # Create temporary file and save speech
         tts = gTTS(text=text, lang="en", slow=False)
         tts.save("audio_out/"+text)
         audio_file = "audio_out/"+text
         print(f"[TTS] Generated new audio for: {text}")
 
-    # Проигрываем в отдельном потоке
+    # Play in separate thread
     threading.Thread(target=play_audio, args=(audio_file,)).start()
 
 
 def play_audio(file_path: str):
-    """Проигрывает аудиофайл через pygame"""
+    """Plays audio file through pygame"""
     try:
-        # Инициализируем mixer один раз
+        # Initialize mixer once
         if not pygame.mixer.get_init():
             pygame.mixer.init()
 
@@ -120,12 +120,12 @@ def play_audio(file_path: str):
 
 
 def stop_tts():
-    """Останавливает воспроизведение и очищает ресурсы"""
+    """Stops playback and cleans up resources"""
     global tts_active
     tts_active = False
     pygame.mixer.quit()
     
-    # Опционально: удаление временных файлов из кеша
+    # Optional: remove temporary files from cache
     for path in tts_cache.values():
         try:
             if os.path.exists(path):
@@ -134,8 +134,8 @@ def stop_tts():
             print(f"[TTS] File deletion error: {e}")
 
 # ==============================
-# Распознавание речи
-# ==============================ex
+# Speech recognition
+# ==============================
 
 def recognize_speech_from_mic(recognizer, microphone):
     with microphone as source:
@@ -157,11 +157,11 @@ def recognize_speech_from_mic(recognizer, microphone):
         return None
 
 # ==============================
-# Клиент FastMCP
+# FastMCP client
 # ==============================
 
 async def call_mcp_tool(tool_name: str, parameters: dict):
-    """Вызывает инструмент MCP-сервера через FastMCP"""
+    """Calls MCP server tool through FastMCP"""
     try:
         async with MCP_http_client:
             result = await MCP_http_client.call_tool(tool_name, parameters)
@@ -172,14 +172,14 @@ async def call_mcp_tool(tool_name: str, parameters: dict):
         return False, str(e)
 
 # ==============================
-# LLM + обработка команд
+# LLM + command processing
 # ==============================
 
 client = Together()
 SYSTEM_PROMPT = None
 
 async def init_system_prompt():
-    """Формируем системный промпт один раз"""
+    """Form system prompt once"""
     global SYSTEM_PROMPT
     if SYSTEM_PROMPT is not None:
         return SYSTEM_PROMPT
@@ -189,7 +189,7 @@ async def init_system_prompt():
         async with MCP_http_client:
             tools = await MCP_http_client.list_tools()
     except Exception as e:
-        print(f"[LLM] Не могу получить список инструментов: {e}")
+        print(f"[LLM] Cannot get list of tools: {e}")
         tools = []
 
     result = await call_mcp_tool("get_available_actions", {})
@@ -267,7 +267,7 @@ async def handle_conversation(user_input: str):
         answer = response.choices[0].message.content.strip()
         print(f"[LLM] Raw response:\n{answer}")
 
-        # Улучшенная обработка JSON
+        # Improved JSON processing
         json_str = answer
         if "```json" in answer:
             json_str = answer.split("```json")[1].split("```")[0].strip()
@@ -277,7 +277,8 @@ async def handle_conversation(user_input: str):
         try:
             response_data = json.loads(json_str)
              
-            # Обрабатываем команды
+            # Process commands
+            toolis = False    
             commands = response_data.get("commands", [])
             if not isinstance(commands, list):
                 commands = [commands]
@@ -285,10 +286,12 @@ async def handle_conversation(user_input: str):
             actrig = False
             for command in commands:
                 tool_name = command.get("tool")
-                if (tool_name == "sniper" or tool_name =="defend"):
+                if (tool_name == "sniper" or tool_name =="defend" or tool_name == "BrewPay"):
                     actrig = True
+                    toolis = True
                 
             if actrig:
+                speak_with_gtts("Check voice")
                 checkcommand = [
                     'eagle_demo_file',
                     'test',
@@ -304,7 +307,7 @@ async def handle_conversation(user_input: str):
                 lines = egrez.stdout.strip().split('\n')
                 parsed_data = []
 
-                # Регулярное выражение для поиска времени и оценки
+                # Regular expression to find time and score
                 pattern = r"time: (\d+\.\d+) sec \| scores -> `master_voice`: (\d+\.\d+)"
 
                 for line in lines:
@@ -327,8 +330,10 @@ async def handle_conversation(user_input: str):
                 if(average_score>0.1):
                     master_talk = True
 
-
-            errAc=False    
+            if (master_talk):
+                speak_with_gtts("Master verified")
+                
+            errAc = False
             for command in commands:
                 if not isinstance(command, dict):
                     continue
@@ -339,15 +344,30 @@ async def handle_conversation(user_input: str):
                 params = command.get("params", {})
 
                 tool_name = command.get("tool")
-                if ((tool_name == "sniper" or tool_name =="defend") and master_talk) or (tool_name != "sniper" and tool_name !=  "defend"):
+                if ((tool_name == "sniper" or tool_name =="defend" or tool_name == "BrewPay") and master_talk) or (tool_name != "sniper" and tool_name !=  "defend" and tool_name != "BrewPay"):
                     permissions = True
-            
+                    
                 print(permissions)
                 if tool_name:
                     if permissions:
                         success, result = await call_mcp_tool(tool_name, params )
                         if not success:
                             speak_with_gtts(f"Failed to execute {tool_name}")
+                        else:
+                            # Handle MCP result format - it's a list of TextContent objects
+                            if isinstance(result, list) and len(result) > 0:
+                                # Extract text from TextContent object
+                                text_content = result[0]
+                                if hasattr(text_content, 'text'):
+                                    speak_with_gtts(text_content.text)
+                                else:
+                                    speak_with_gtts("Command executed successfully")
+                            elif isinstance(result, dict) and "text" in result:
+                                speak_with_gtts(result["text"])
+                            elif isinstance(result, str):
+                                speak_with_gtts(result)
+                            else:
+                                speak_with_gtts("Command executed successfully")
                     else:
                         speak_with_gtts("You do not have permission to perform this action.")
                         errAc=True
@@ -355,12 +375,12 @@ async def handle_conversation(user_input: str):
                     print("[LLM] Missing tool name in command")
                     
 
-            # Добавляем ответ ассистента в историю
+            # Add assistant response to history
             message_history.append({"role": "assistant", "content": answer})
 
-            # Озвучиваем ответ
+            # Speak the response
             verbal_response = response_data.get("answer", "I'll execute your request")
-            if not errAc:
+            if not errAc and not toolis:
                 speak_with_gtts(verbal_response)
 
 
@@ -376,7 +396,7 @@ async def handle_conversation(user_input: str):
         speak_with_gtts("I couldn't process your request")
 
 # ==============================
-# Основной цикл
+# Main loop
 # ==============================
 
 
@@ -444,7 +464,7 @@ async def main():
         time.sleep(1.6)
         speak_with_gtts("Tell me a little about yourself so I can remember your voice.")
         time.sleep(4.2)
-        #TODO Обрабокта ошибок
+        #TODO Error handling
         subprocess.run(regcommand, check=True, capture_output=True, text=True)
         speak_with_gtts("New master registered!")
         time.sleep(2)
@@ -461,27 +481,27 @@ async def main():
     
     
     #TODO
-    #Не работает ручнйо проброс микрофона, ошибка частоты
-    #Работает толкьо при старте с "по умолчанию". 
-    #Для этого 1 раз запускамем с выклченной внешенй звуковой
-    #Подключаем нужынй микрфоон
-    #Далее встроенный динамик можно вернуть
-    #ВОзможно просто достаточн озагрузиться без динамика или выдернуть его чтоыб поменялся индекс устрйоства?
-    # Создаем экземпляр Porcupine
+    #Manual microphone passthrough doesn't work, frequency error
+    #Works only when starting with "default".
+    #For this, run once with external audio disabled
+    #Connect the needed microphone
+    #Then the built-in speaker can be returned
+    #Maybe just boot without speaker or unplug it to change device index?
+    # Create Porcupine instance
     porcupine = pvporcupine.create(
         access_key=ACCESSW_KEY,
         keyword_paths=KEYWORD_PATHS,
         sensitivities= [0.9]* len(KEYWORD_PATHS)
     )
 
-    # Настройка аудио потока
+    # Audio stream setup
     recorder = PvRecorder(
         frame_length=porcupine.frame_length,
         #device_index=1
         )
     recorder.start()
 
-    #Словарь связанынй со стрельбой
+    #Dictionary related to shooting
     search_words = ["save", "safe", "attack", "enemy", "opponent","fire","snipe","sniper"]
     print(f"Say Robot to start...")
     try:
@@ -516,9 +536,9 @@ async def main():
                         pan.publish(s1msg)
                         time.sleep(0.5)
                         pan.publish(s2msg)
-                    else:
+                    #else:
                         #action.publish(thinkmsg)
-                        speak_with_gtts("Thinking...")
+                        #speak_with_gtts("Thinking...")
                     await handle_conversation(user_query)
                     pan.publish(panFXmsg)
                     tilt.publish(panFXmsg)
@@ -533,8 +553,8 @@ async def main():
         print("\n User stop")
 
     finally:
-        # Очистка ресурсов
-        print("\n Clearning...")
+        # Clean up resources
+        print("\n Cleaning...")
         action.unadvertise()
         tilt.unadvertise()
         pan.unadvertise()

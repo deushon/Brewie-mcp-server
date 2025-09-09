@@ -46,11 +46,11 @@ class CameraSubscriber:
         self.image_topic = imTop
 
     def on_image_received(self, message):
-        # Колбэк, который вызывается при получении нового сообщения
+        # Callback that is called when a new message is received
         self.last_image = message
 
     def get_last_image(self):
-        # Метод, который возвращает последний сохраненный снимок
+        # Method that returns the last saved image
         return self.last_image
     def subs(self):
         self.image_topic.subscribe(self.on_image_received)
@@ -74,7 +74,7 @@ def encode_image(image_path):
 def photo_cln(folder_path):
 
     if not os.path.isdir(folder_path):
-        print(f"Error: Path '{folder_path}' break")
+        print(f"Error: Path '{folder_path}' is invalid")
         return
 
     for filename in os.listdir(folder_path):
@@ -82,103 +82,103 @@ def photo_cln(folder_path):
         try:
             if os.path.isfile(file_path):
                 os.remove(file_path)
-                print(f"DELL: {file_path}")
+                print(f"DELETED: {file_path}")
         except Exception as e:
-            print(f"Dell error {file_path}: {e}")
+            print(f"Delete error {file_path}: {e}")
 
 def detect_qr_code(image_path):
-    """Обнаруживает QR-код на изображении и возвращает его содержимое"""
+    """Detects QR code on image and returns its content"""
     try:
-        # Загружаем изображение
+        # Load the image
         image = cv2.imread(image_path)
         if image is None:
-            return None, "Не удалось загрузить изображение"
+            return None, "Failed to load image"
         
-        # Декодируем QR-коды
+        # Decode QR codes
         qr_codes = pyzbar.decode(image)
         
         if not qr_codes:
-            return None, "QR-код не найден на изображении"
+            return None, "QR code not found on image"
         
-        # Возвращаем содержимое первого найденного QR-кода
+        # Return content of the first found QR code
         qr_data = qr_codes[0].data.decode('utf-8')
-        return qr_data, "QR-код успешно распознан"
+        return qr_data, "QR code successfully recognized"
         
     except Exception as e:
-        return None, f"Ошибка при распознавании QR-кода: {str(e)}"
+        return None, f"Error recognizing QR code: {str(e)}"
 
 def validate_sol_address(address):
-    """Проверяет, является ли адрес валидным адресом Solana"""
+    """Checks if address is a valid Solana address"""
     try:
-        # Базовая проверка длины адреса Solana (44 символа в base58)
+        # Basic check of Solana address length (44 characters in base58)
         if len(address) != 44:
-            return False, "Неверная длина адреса Solana"
+            return False, "Invalid Solana address length"
         
-        # Проверяем, что адрес содержит только допустимые символы base58
+        # Check that address contains only valid base58 characters
         import base58
         try:
             decoded = base58.b58decode(address)
-            if len(decoded) != 32:  # Solana адреса должны декодироваться в 32 байта
-                return False, "Неверный формат адреса Solana"
+            if len(decoded) != 32:  # Solana addresses should decode to 32 bytes
+                return False, "Invalid Solana address format"
         except:
-            return False, "Неверный формат адреса Solana"
+            return False, "Invalid Solana address format"
         
-        return True, "Адрес Solana валиден"
+        return True, "Solana address is valid"
     except Exception as e:
-        return False, f"Ошибка валидации адреса: {str(e)}"
+        return False, f"Address validation error: {str(e)}"
 
 def load_private_key():
-    """Загружает закрытый ключ из файла master_sh"""
+    """Loads private key from master_sh file"""
     try:
         key_file = "master_sh/sol_private_key"
         if not os.path.exists(key_file):
-            return None, "Файл с закрытым ключом не найден"
+            return None, "Private key file not found"
         
         with open(key_file, 'r') as f:
             private_key = f.read().strip()
         
-        return private_key, "Закрытый ключ загружен"
+        return private_key, "Private key loaded"
     except Exception as e:
-        return None, f"Ошибка загрузки закрытого ключа: {str(e)}"
+        return None, f"Error loading private key: {str(e)}"
 
 def transfer_sol(to_address, amount, private_key):
-    """Выполняет реальный перевод SOL в сети Solana"""
+    """Performs real SOL transfer in Solana network"""
     try:
-        print(f"Начинаем перевод {amount} SOL на адрес {to_address}")
+        print(f"Starting transfer of {amount} SOL to address {to_address}")
         
-        # Подключаемся к Solana RPC (mainnet)
+        # Connect to Solana RPC (mainnet)
         rpc_url = "https://api.mainnet-beta.solana.com"
         client = Client(rpc_url)
         
-        # Создаем Keypair из закрытого ключа
+        # Create Keypair from private key
         try:
-            # Декодируем закрытый ключ из base58
+            # Decode private key from base58
             private_key_bytes = base58.b58decode(private_key)
             keypair = Keypair.from_bytes(private_key_bytes)
-            print(f"Кошелек загружен: {keypair.pubkey()}")
+            print(f"Wallet loaded: {keypair.pubkey()}")
         except Exception as e:
-            return False, f"Ошибка загрузки закрытого ключа: {str(e)}"
+            return False, f"Error loading private key: {str(e)}"
         
-        # Создаем PublicKey для получателя
+        # Create PublicKey for recipient
         try:
             recipient_pubkey = PublicKey.from_string(to_address)
         except Exception as e:
-            return False, f"Неверный адрес получателя: {str(e)}"
+            return False, f"Invalid recipient address: {str(e)}"
         
-        # Конвертируем SOL в lamports (1 SOL = 1,000,000,000 lamports)
+        # Convert SOL to lamports (1 SOL = 1,000,000,000 lamports)
         lamports = int(amount * 1_000_000_000)
         
-        # Получаем последний блок хеш
+        # Get latest block hash
         try:
             recent_blockhash = client.get_latest_blockhash()
             if recent_blockhash.value is None:
-                return False, "Не удалось получить последний блок хеш"
+                return False, "Failed to get latest block hash"
         except Exception as e:
-            return False, f"Ошибка получения блок хеша: {str(e)}"
+            return False, f"Error getting block hash: {str(e)}"
         
-        # Создаем транзакцию
+        # Create transaction
         try:
-            # Создаем инструкцию перевода
+            # Create transfer instruction
             transfer_instruction = transfer(
                 TransferParams(
                     from_pubkey=keypair.pubkey(),
@@ -187,51 +187,51 @@ def transfer_sol(to_address, amount, private_key):
                 )
             )
             
-            # Создаем сообщение транзакции
+            # Create transaction message
             message = Message.new_with_blockhash(
                 instructions=[transfer_instruction],
                 payer=keypair.pubkey(),
                 blockhash=Hash.from_string(str(recent_blockhash.value.blockhash))
             )
             
-            # Создаем транзакцию
+            # Create transaction
             transaction = Transaction.new_unsigned(message)
             
         except Exception as e:
-            return False, f"Ошибка создания транзакции: {str(e)}"
+            return False, f"Error creating transaction: {str(e)}"
         
-        # Подписываем транзакцию
+        # Sign transaction
         try:
             transaction.sign([keypair], Hash.from_string(str(recent_blockhash.value.blockhash)))
-            print("Транзакция подписана")
+            print("Transaction signed")
         except Exception as e:
-            return False, f"Ошибка подписания транзакции: {str(e)}"
+            return False, f"Error signing transaction: {str(e)}"
         
-        # Отправляем транзакцию
+        # Send transaction
         try:
-            print("Отправляем транзакцию в сеть...")
+            print("Sending transaction to network...")
             result = client.send_transaction(
                 transaction,
                 opts=TxOpts(skip_preflight=False, preflight_commitment="confirmed")
             )
             
             if result.value is None:
-                return False, "Транзакция не была отправлена"
+                return False, "Transaction was not sent"
             
             signature = result.value
-            print(f"Транзакция отправлена: {signature}")
+            print(f"Transaction sent: {signature}")
             
-            # Ждем подтверждения
-            print("Ждем подтверждения транзакции...")
+            # Wait for confirmation
+            print("Waiting for transaction confirmation...")
             confirmation = client.confirm_transaction(signature, commitment="confirmed")
             
-            # Проверяем статус подтверждения
+            # Check confirmation status
             confirmation_status = confirmation.value[0].confirmation_status
-            print(f"Статус подтверждения: {confirmation_status}")
-            print(f"Тип статуса: {type(confirmation_status)}")
+            print(f"Confirmation status: {confirmation_status}")
+            print(f"Status type: {type(confirmation_status)}")
             
-            # Проверяем, что транзакция подтверждена
-            # Статус может быть строкой или enum объектом
+            # Check that transaction is confirmed
+            # Status can be string or enum object
             status_str = str(confirmation_status).lower()
             is_confirmed = (
                 "confirmed" in status_str or 
@@ -241,15 +241,15 @@ def transfer_sol(to_address, amount, private_key):
             )
             
             if is_confirmed:
-                return True, f"Перевод {amount} SOL на адрес {to_address} выполнен успешно! Подпись транзакции: {signature}"
+                return True, f"Transfer of {amount} SOL to target completed successfully! Transaction signature in logs"
             else:
-                return False, f"Транзакция не подтверждена. Статус: {confirmation_status}"
+                return False, f"Transaction not confirmed. Status: {confirmation_status}"
                 
         except Exception as e:
-            return False, f"Ошибка отправки транзакции: {str(e)}"
+            return False, f"Error sending transaction: {str(e)}"
         
     except Exception as e:
-        return False, f"Критическая ошибка при выполнении перевода: {str(e)}"
+        return False, f"Critical error during transfer execution: {str(e)}"
 
 
 mcp = FastMCP("ros-mcp-server")
@@ -294,6 +294,7 @@ def defend(rotate: float, UPDOWN: float):
         'position': rotate_fx,
         'duration': 0.5,
     })
+    
 
     tiltmsg = roslibpy.Message({
         'position': UPDOWN_fx,
@@ -376,7 +377,7 @@ def run_action(action_name: str):
 def get_image():
     #TODO IN sniper game back images on 1 side only. I thn what it error from subscriber
     try:
-        # Получаем последнее сообщение.
+        # Get the last message.
         received_msg = Csubscriber.get_last_image()
 
         start_time = time.time()
@@ -389,18 +390,18 @@ def get_image():
 
         msg = received_msg
 
-        # Проверяем, является ли формат сжатым.
+        # Check if format is compressed.
         if 'format' in msg and 'data' in msg:
-            # Обработка сжатого изображения (CompressedImage)
+            # Process compressed image (CompressedImage)
             
-            # Декодируем данные Base64
+            # Decode Base64 data
             data_b64 = msg['data']
             image_bytes = base64.b64decode(data_b64)
             
-            # Преобразуем массив байтов в NumPy-массив
+            # Convert byte array to NumPy array
             img_np = np.frombuffer(image_bytes, np.uint8)
             
-            # Декодируем изображение из JPEG/PNG с помощью OpenCV
+            # Decode image from JPEG/PNG using OpenCV
             img_cv = cv2.imdecode(img_np, cv2.IMREAD_UNCHANGED)
             
             if img_cv is None:
@@ -408,7 +409,7 @@ def get_image():
                 return "Decoding error"
 
         elif 'height' in msg and 'width' in msg and 'encoding' in msg:
-            # Обработка несжатого изображения (Image)
+            # Process uncompressed image (Image)
             height = msg["height"]
             width = msg["width"]
             encoding = msg["encoding"]
@@ -431,7 +432,7 @@ def get_image():
             return "Format error"
 
         downloads_dir = "photos/environment"
-        # Убедимся, что директория существует.
+        # Make sure directory exists.
         os.makedirs(downloads_dir, exist_ok=True)
         items = os.listdir(downloads_dir)
 
@@ -555,62 +556,78 @@ def sniper(targediscr:str):
     pan.unadvertise()
     return 
 
-@mcp.tool(description="This tool performs SOL transfer by taking a photo, detecting QR code with SOL wallet address, and executing the transfer. Takes amount in SOL as parameter.")
+@mcp.tool(description="This tool performs SOL transfer by taking a photo, detecting QR code with SOL wallet address, and executing the transfer. Takes amount in SOL as parameter. If user say transfer in $ conver 218,88 $ to 1 SOL. If user just ask about transfer, don't use it tool and just short answer how to use it.")
 def BrewPay(amount: float):
     """
-    Выполняет перевод SOL:
-    1. Очищает папку с фото
-    2. Делает снимок
-    3. Ищет и распознает QR-код с адресом SOL кошелька
-    4. Валидирует адрес
-    5. Выполняет перевод
+    Performs SOL transfer:
+    1. Clears photo folder
+    2. Takes a photo
+    3. Searches and recognizes QR code with SOL wallet address
+    4. Validates address
+    5. Executes transfer
     """
+
+    QRSmsg = roslibpy.Message({
+        'position': -0.3,
+        'duration': 0.5,
+    })
+    Zermsg = roslibpy.Message({
+        'position': -0.3,
+        'duration': 0.5,
+    })
+
+    tilt.publish(QRSmsg)   
+    time.sleep(1.5)
+
     try:
-        print(f"Начинаем перевод {amount} SOL")
+        print(f"Starting transfer of {amount} SOL")
         
-        # 1. Очищаем папку с фото
+        # 1. Clear photo folder
         photo_cln("photos/environment")
-        print("Папка с фото очищена")
+        print("Photo folder cleared")
         
-        # 2. Делаем снимок
-        print("Делаем снимок...")
+        # 2. Take a photo
+        print("Taking photo...")
         image_result = get_image()
-        print("Готов")
+        print("Ready")
         
         image_path = "photos/environment/image_0.png" 
+
+        tilt.publish(Zermsg)
         
-        print(f"Анализируем снимок: {image_path}")
         
-        # 4. Распознаем QR-код
+        print(f"Analyzing photo: {image_path}")
+        
+        # 4. Recognize QR code
         qr_data, qr_message = detect_qr_code(image_path)
         if qr_data is None:
-            return f"Ошибка: {qr_message}"
+            return f"Error: {qr_message}"
         
-        print(f"QR-код распознан: {qr_data}")
+        print(f"QR code recognized: {qr_data}")
         
-        # 5. Валидируем адрес SOL
+        # 5. Validate SOL address
         is_valid, validation_message = validate_sol_address(qr_data)
         if not is_valid:
-            return f"Ошибка: {validation_message}"
+            return f"Error: {validation_message}"
         
-        print(f"Адрес SOL валиден: {qr_data}")
+        print(f"SOL address is valid: {qr_data}")
         
-        # 6. Загружаем закрытый ключ
+        # 6. Load private key
         private_key, key_message = load_private_key()
         if private_key is None:
-            return f"Ошибка: {key_message}"
+            return f"Error: {key_message}"
         
-        print("Закрытый ключ загружен")
+        print("Private key loaded")
         
-        # 7. Выполняем перевод
+        # 7. Execute transfer
         success, transfer_message = transfer_sol(qr_data, amount, private_key)
         if not success:
-            return f"Ошибка перевода: {transfer_message}"
+            return f"Transfer error: {transfer_message}"
         
-        return f"Успешно! {transfer_message}"
+        return f"Success! {transfer_message}"
         
     except Exception as e:
-        return f"Критическая ошибка: {str(e)}"
+        return f"Critical error: {str(e)}"
 
 if __name__ == "__main__":
     ROSclient.run()

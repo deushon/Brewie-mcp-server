@@ -1,86 +1,86 @@
-# Инструкции по настройке SOL переводов
+# SOL Transfer Setup Instructions
 
-## ⚠️ ВНИМАНИЕ: РЕАЛЬНЫЕ ПЕРЕВОДЫ В MAINNET
+## ⚠️ WARNING: REAL TRANSFERS IN MAINNET
 
-Этот инструмент выполняет **РЕАЛЬНЫЕ** переводы SOL в основной сети Solana (mainnet). 
-Убедитесь, что вы понимаете риски и используете только тестовые суммы!
+This tool performs **REAL** SOL transfers in the main Solana network (mainnet). 
+Make sure you understand the risks and use only test amounts!
 
-## Установка зависимостей
+## Installing Dependencies
 
-Установите дополнительные зависимости для работы с QR-кодами и Solana:
+Install additional dependencies for working with QR codes and Solana:
 
 ```bash
 pip install -r requirements_sol.txt
 ```
 
-### Проверка установки
+### Installation Check
 
-Запустите тест для проверки всех импортов:
+Run a test to check all imports:
 
 ```bash
 python3 test_imports.py
 ```
 
-Если все тесты пройдены, система готова к работе!
+If all tests pass, the system is ready to work!
 
-## Формат закрытого ключа
+## Private Key Format
 
-Создайте файл `master_sh/sol_private_key` с вашим закрытым ключом Solana.
+Create a file `master_sh/sol_private_key` with your Solana private key.
 
-### Формат файла:
+### File Format:
 ```
-[ваш_закрытый_ключ_в_base58_формате]
+[your_private_key_in_base58_format]
 ```
 
-### Пример:
+### Example:
 ```
 5KJvsngHeMpm884wtkJQQLi2Xr3q7D4z79dAMRzjXQvsRzVtQU9
 ```
 
-### Как получить закрытый ключ:
+### How to get private key:
 
-1. **Из Phantom Wallet:**
-   - Откройте Phantom
+1. **From Phantom Wallet:**
+   - Open Phantom
    - Settings → Show Private Key
-   - Скопируйте ключ в base58 формате
+   - Copy the key in base58 format
 
-2. **Из Solflare:**
+2. **From Solflare:**
    - Settings → Export Private Key
-   - Выберите формат base58
+   - Choose base58 format
 
-3. **Из командной строки Solana CLI:**
+3. **From Solana CLI command line:**
    ```bash
    solana-keygen new --outfile ~/my-wallet.json
-   # Ключ будет в файле в формате JSON array
+   # Key will be in file in JSON array format
    ```
 
-### Важно:
-- Никогда не делитесь закрытым ключом
-- Храните файл в безопасном месте
-- Убедитесь, что файл имеет правильные права доступа (600)
+### Important:
+- Never share your private key
+- Keep the file in a secure location
+- Make sure the file has correct permissions (600)
 
-## Тестирование
+## Testing
 
-После настройки вы можете протестировать инструмент:
+After setup you can test the tool:
 
 ```python
-# В Python консоли или через MCP клиент
-BrewPay(0.001)  # Перевести 0.001 SOL (рекомендуется начать с малых сумм)
+# In Python console or through MCP client
+BrewPay(0.001)  # Transfer 0.001 SOL (recommended to start with small amounts)
 ```
 
-### Процесс работы:
-1. Робот очищает папку с фото
-2. Делает снимок
-3. Ищет QR-код с адресом SOL кошелька
-4. Валидирует адрес
-5. Загружает ваш закрытый ключ
-6. Создает и подписывает транзакцию
-7. Отправляет транзакцию в сеть Solana
-8. Ждет подтверждения
-9. Возвращает результат с подписью транзакции
+### Work Process:
+1. Robot clears photo folder
+2. Takes a photo
+3. Searches for QR code with SOL wallet address
+4. Validates address
+5. Loads your private key
+6. Creates and signs transaction
+7. Sends transaction to Solana network
+8. Waits for confirmation
+9. Returns result with transaction signature
 
-## Безопасность
+## Security
 
-- Закрытый ключ хранится локально в файле `master_sh/sol_private_key`
-- Файл должен быть доступен только для чтения владельцу
-- Рекомендуется использовать отдельный кошелек для тестирования
+- Private key is stored locally in file `master_sh/sol_private_key`
+- File should be readable only by owner
+- Recommended to use separate wallet for testing
