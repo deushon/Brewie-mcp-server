@@ -14,6 +14,7 @@ import json
 import requests
 from solana.rpc.api import Client
 from solana.rpc.types import TxOpts
+from solana.rpc.commitment import Commitment
 from solders.transaction import Transaction
 from solders.keypair import Keypair
 from solders.pubkey import Pubkey as PublicKey
@@ -224,10 +225,25 @@ def transfer_sol(to_address, amount, private_key):
             print("Ждем подтверждения транзакции...")
             confirmation = client.confirm_transaction(signature, commitment="confirmed")
             
-            if confirmation.value[0].confirmation_status == "confirmed":
+            # Проверяем статус подтверждения
+            confirmation_status = confirmation.value[0].confirmation_status
+            print(f"Статус подтверждения: {confirmation_status}")
+            print(f"Тип статуса: {type(confirmation_status)}")
+            
+            # Проверяем, что транзакция подтверждена
+            # Статус может быть строкой или enum объектом
+            status_str = str(confirmation_status).lower()
+            is_confirmed = (
+                "confirmed" in status_str or 
+                "finalized" in status_str or
+                confirmation_status == "confirmed" or
+                confirmation_status == "finalized"
+            )
+            
+            if is_confirmed:
                 return True, f"Перевод {amount} SOL на адрес {to_address} выполнен успешно! Подпись транзакции: {signature}"
             else:
-                return False, f"Транзакция не подтверждена. Статус: {confirmation.value[0].confirmation_status}"
+                return False, f"Транзакция не подтверждена. Статус: {confirmation_status}"
                 
         except Exception as e:
             return False, f"Ошибка отправки транзакции: {str(e)}"
